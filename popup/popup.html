@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SnapMark</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Inter:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="wordmark">SnapMark</header>
+    <hr class="rule" />
+    <div class="actions">
+      <button type="button" id="btn-visible" class="btn btn-primary">
+        Capture Visible Area
+      </button>
+      <button type="button" id="btn-full" class="btn btn-secondary">
+        Capture Full Page
+      </button>
+    </div>
+    <p id="status" class="status" aria-live="polite">Ready to capture</p>
+    <script src="../lib/screenshot-idb.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
