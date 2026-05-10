@@ -4,47 +4,61 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SnapMark — Privacy Policy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
     <style>
       body {
         margin: 0;
-        padding: 48px 24px 64px;
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        padding: 48px 24px 72px;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         font-size: 16px;
-        line-height: 1.6;
+        line-height: 1.65;
         color: #1a1a1a;
         background: #ffffff;
-        max-width: 640px;
+        max-width: 680px;
         margin-left: auto;
         margin-right: auto;
       }
 
-      h1 {
-        margin: 0 0 8px;
-        font-size: 1.75rem;
+      .brand {
+        margin: 0 0 4px;
+        font-size: 1.5rem;
         font-weight: 600;
-        letter-spacing: -0.02em;
         color: #0f0f0f;
+        letter-spacing: -0.02em;
       }
 
-      .subtitle {
+      .updated {
         margin: 0 0 32px;
-        font-size: 0.875rem;
+        font-size: 0.8125rem;
         color: #666;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: 1.375rem;
+        font-weight: 600;
+        color: #0f0f0f;
+        line-height: 1.3;
       }
 
       h2 {
         margin: 28px 0 12px;
-        font-size: 1rem;
+        font-size: 1.0625rem;
         font-weight: 600;
         color: #0f0f0f;
       }
 
       p {
-        margin: 0 0 12px;
+        margin: 0 0 14px;
       }
 
       ul {
-        margin: 0 0 16px;
+        margin: 0 0 14px;
         padding-left: 1.25rem;
       }
 
@@ -55,28 +69,48 @@
       li:last-child {
         margin-bottom: 0;
       }
+
+      a {
+        color: #1a1a1a;
+      }
     </style>
   </head>
   <body>
-    <h1>SnapMark</h1>
-    <p class="subtitle">Privacy Policy</p>
+    <p class="brand">SnapMark</p>
+    <p class="updated">Last updated: May 2025</p>
+
+    <h1>SnapMark Privacy Policy</h1>
 
     <p>
-      This privacy policy describes how SnapMark handles information when you use the SnapMark browser extension.
+      SnapMark is a Chrome Extension that captures and annotates screenshots. We are committed to protecting your privacy.
     </p>
 
-    <h2>Summary</h2>
+    <h2>Data Collection</h2>
+    <p>
+      SnapMark does not collect, store, or transmit any personal data. We have no servers, no accounts, and no analytics.
+    </p>
+
+    <h2>How the Extension Works</h2>
     <ul>
-      <li>SnapMark does not collect any user data.</li>
-      <li>All processing happens locally on your device.</li>
-      <li>No data is sent to external servers.</li>
-      <li>There is no analytics or tracking of any kind.</li>
-      <li>Screenshots stay on your device.</li>
+      <li>Screenshots are captured locally on your device</li>
+      <li>All processing happens in your browser</li>
+      <li>Screenshot data is stored temporarily in your browser's local IndexedDB and deleted after use</li>
+      <li>No data ever leaves your device</li>
     </ul>
 
-    <p>
-      If you use features that save or export images (for example, downloading a file or copying to your clipboard),
-      that action occurs on your device under your control. SnapMark does not receive copies of your screenshots.
-    </p>
+    <h2>Permissions</h2>
+    <p>SnapMark requests the following permissions solely to provide screenshot functionality:</p>
+    <ul>
+      <li><strong>activeTab:</strong> to capture the current tab</li>
+      <li><strong>scripting:</strong> to enable full page capture</li>
+      <li><strong>storage:</strong> to temporarily pass screenshot data</li>
+      <li><strong>tabs:</strong> to open the annotator in a new tab</li>
+    </ul>
+
+    <h2>Third Party Services</h2>
+    <p>SnapMark does not use any third party services, analytics, or tracking tools.</p>
+
+    <h2>Contact</h2>
+    <p>For questions: <a href="mailto:hi.mzkdesign@gmail.com">hi.mzkdesign@gmail.com</a></p>
   </body>
 </html>
