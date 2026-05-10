@@ -4,7 +4,9 @@ This document is the **handoff spec** for the MV3 extension in `screengrab-exten
 
 **Product naming:** Manifest title is **SnapMark** (`manifest.json`). The directory is still `screengrab-extension/` from an older “ScreenGrab” brief. In-app copy uses **SnapMark** in the popup and annotator.
 
-**Repository note:** This tree may **not** be initialized as a Git repo in all environments. If `.git` is missing, you cannot use `git checkout` to time-travel; use this file + file reads instead.
+**Git** — Repo root is **`screengrab-extension/`** (branch **`main`**). **`.gitignore`:** `.DS_Store`, `*.log`, `node_modules/`, `.cursorrules`. Remote **`origin`:** `https://github.com/himzkdesign/snapmark-extension.git`. Initial commit message: **feat: SnapMark v1.0 MVP - screenshot capture, annotation, and mockup**. If **`git push -u origin main`** has not completed (e.g. host needs GitHub auth), run it from **`screengrab-extension/`** after signing in (HTTPS + PAT, **`gh`**, or SSH remote).
+
+**Repository note (clones / no `.git`):** In environments without a local **`.git`** directory, you cannot use **`git checkout`** to time-travel; use this file + file reads instead.
 
 ---
 
@@ -21,6 +23,7 @@ This document is the **handoff spec** for the MV3 extension in `screengrab-exten
 
 ```
 screengrab-extension/
+├── .gitignore
 ├── manifest.json
 ├── CONTEXT.md
 ├── lib/
@@ -286,7 +289,7 @@ There is **no** separate full-height left sidebar beyond this **68px** tool rail
 2. **Full-page capture** — Wide pages (scroll width > viewport) are vertical-stitch only; timing / DPR / **`MAX_CANVAS_HEIGHT`** in **`content/capture.js`** remain tuning knobs.
 3. **`roundRect`** — Used for annotation highlight rects when supported; fallback is axis-aligned `rect`.
 4. **Accessibility** — Cards, panel, and shortcuts could use more **`aria-*`**, focus order, and live regions for export errors.
-5. **No Git in some checkouts** — Cannot rely on `HEAD~1` without initializing a remote or local repo.
+5. **Clone / no `.git`** — Same as the **Repository note** at the top: without a local repo, rely on this spec or obtain the source from **GitHub** (`himzkdesign/snapmark-extension`).
 6. **IndexedDB** — Lives on the **extension origin** (popup + annotator only); content scripts do not read/write **`SnapMarkDB`**.
 7. **Narrow viewports** — **Mockup** panel is **~378px** wide; verify overlap with scaled **`#canvas-stack`** on small windows.
 
@@ -311,4 +314,4 @@ There is **no** separate full-height left sidebar beyond this **68px** tool rail
 
 ---
 
-*Last updated: **Mockup** radius presets are **0 / 8 / 16 / 24** px (None / Small / Medium / iOS); **BORDER WIDTH** block has **`margin-top: 16px`** after **RADIUS**. **`borderWidth`** slider, **`computeMockupLayout`**, **`drawMockupBorderFrame`**, **Apply Mockup** → **Select** after **300ms** unchanged. **Purpose** includes optional **Mockup** in the MVP flow. **Mockup** section documents **`mockupState`**, **`originalImageData`**, **`previewMockup`**, **`applyMockup`** / **`resetMockup`**, panel + history. **Logic highlights** and **Architecture** reference mockup; **Known issues** notes narrow-viewport panel width. **Next tasks** prioritize QA including mockup.*
+*Last updated: **Git** — repo in **`screengrab-extension/`**, **`main`**, **`.gitignore`**, remote **`https://github.com/himzkdesign/snapmark-extension.git`**, initial **feat: SnapMark v1.0 MVP** commit; complete **`git push -u origin main`** on a machine with GitHub credentials if needed. **Mockup** radius **0 / 8 / 16 / 24**; **BORDER WIDTH** **`margin-top: 16px`**. **Purpose** and **Mockup** sections as above. **Next tasks** prioritize QA including mockup.*
