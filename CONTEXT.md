@@ -85,7 +85,7 @@ IndexedDB **`SnapMarkDB`** / store **`screenshots`** holds `{ dataUrl, type }` a
 | **`#mockup-context-panel`** | **Fixed** (`left: 68px`, `top: 52px`), **~378px** wide (`annotator.css`), `z-index: 25`, same slide animation as Annotate. **Only when Mockup is active** (`mockup-context-panel--open`). Sections (top → bottom): **DEVICE FRAME** (None / Browser / Border), **RADIUS**, **`#mockup-border-width-section`** (**BORDER WIDTH** slider, **only when Border** is selected), **SHADOW**, **BACKGROUND**, **PADDING**, **Apply Mockup**, **`#mockup-reset-row`** with **Reset** (visible when `mockupState.applied`). Delegated **`click`** on the panel + **`input`** on **`#mockup-border-width`** (see **Mockup** below). |
 | **`#app-main`** | **Flex row**: **`#sidebar-shell`** (68px) + **`#canvas-area`** (flex 1). |
 | **`#sidebar-shell`** | Wraps **`#sidebar-tools`** only (no color strip inside the rail). |
-| **`#sidebar-tools`** | **68px** rail: **Select**, **Mockup**, **Annotate** (stacked). Class **`sidebar-tools--select-active`** when **Select** is active. |
+| **`#sidebar-tools`** | **68px** rail: **Select**, **Mockup**, **Annotate** (stacked) + **`.sidebar-tools__spacer`** (`flex: 1`) + **feedback** (bottom). Class **`sidebar-tools--select-active`** when **Select** is active. |
 | **`#canvas-area`** | Scrollable workspace; `z-index: 1` so the fixed panel can sit above it. |
 
 **`#canvas-stack`:** `#board` (canvas) → `#annotation-connectors` (SVG) → `#annotation-cards` (DOM cards).
@@ -104,7 +104,8 @@ There is **no** separate full-height left sidebar beyond this **68px** tool rail
 - **Select icon:** Stroke-based **four-way move** cross (not the old filled cursor arrow).
 - **Active state:** `rgba(255,255,255,0.08)` fill, `1px rgba(255,255,255,0.1)` border, **10px** radius, light shadow; icon/label **white**, label **font-weight 600**.
 - **Inactive:** Transparent; icon/label `#555`; **hover** slightly brighter background/border (`#888` text).
-- **Removed:** Inset **`--accent-color`** bar on tools, hover **tooltips** (labels on the rail made them redundant).
+- **Feedback (bottom):** **`#btn-feedback`** — **36×36px**, transparent, **16px** question-mark icon **`#444`**, hover bg **`#1a1a1a`** / icon **`#888`**; tooltip **“Give feedback”** after **400ms** (Geist Mono chip at **`left: 76px`**, vertically centered); click runs **`window.open(FEEDBACK_FORM_URL, '_blank')`** (**`FEEDBACK_FORM_URL`** → Google Form SnapMark feedback).
+- **Removed:** Inset **`--accent-color`** bar on tools; hover **tooltips** on the main three tools (on-rail **labels** made them redundant). **Exception:** **feedback** button — delayed **“Give feedback”** tooltip only.
 
 **`setTool()`** in `annotator.js` toggles **`sidebar-tools--select-active`** when `next === "select"`, updates **`annotate-context-panel--open`** / **`inert`** / **`aria-hidden`** only for Annotate, updates **`mockup-context-panel--open`** / **`inert`** / **`aria-hidden`** only for Mockup, and clears annotate drag state when leaving Annotate.
 
@@ -259,7 +260,7 @@ There is **no** separate full-height left sidebar beyond this **68px** tool rail
 | Item | Outcome |
 |------|--------|
 | **Narrow sidebar + full-height color strip** (`:has()` / slide strip) | Replaced by **fixed contextual panel** + swatches only in panel. |
-| **Sidebar tool tooltips** | Removed; on-rail **labels** + **`aria-keyshortcuts`** suffice. |
+| **Sidebar tool tooltips** (main three) | Removed; on-rail **labels** + **`aria-keyshortcuts`** suffice. **Exception:** **feedback** link uses a delayed **“Give feedback”** chip (see **Sidebar tools**). |
 | **`--accent-color` inset** on active tool | Removed for **Figma-like pill** tool states (no colored bar on tools). |
 | **Experimental Figma-style annotation card** (wide card, pill category cycling, no menu, etc.) | **Reverted** — restored **select + ⋯ menu + preview** card. |
 | **DOM pin number badge on card** | **Removed** — number **only** on canvas pin. |
@@ -314,4 +315,4 @@ There is **no** separate full-height left sidebar beyond this **68px** tool rail
 
 ---
 
-*Last updated: **Git** — repo in **`screengrab-extension/`**, **`main`**, **`.gitignore`**, remote **`https://github.com/himzkdesign/snapmark-extension.git`**, initial **feat: SnapMark v1.0 MVP** commit; complete **`git push -u origin main`** on a machine with GitHub credentials if needed. **Mockup** radius **0 / 8 / 16 / 24**; **BORDER WIDTH** **`margin-top: 16px`**. **Purpose** and **Mockup** sections as above. **Next tasks** prioritize QA including mockup.*
+*Last updated: **Sidebar** — **`#btn-feedback`** + **`window.open(FEEDBACK_FORM_URL, '_blank')`** (Google Form). **Git** — repo in **`screengrab-extension/`**, **`main`**, **`.gitignore`**, remote **`https://github.com/himzkdesign/snapmark-extension.git`**, initial **feat: SnapMark v1.0 MVP** commit; complete **`git push -u origin main`** on a machine with GitHub credentials if needed. **Mockup** radius **0 / 8 / 16 / 24**; **BORDER WIDTH** **`margin-top: 16px`**. **Purpose** and **Mockup** sections as above. **Next tasks** prioritize QA including mockup.*

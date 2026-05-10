@@ -1,6 +1,8 @@
 (() => {
   const STORAGE_SCREENSHOT = "snapmark_screenshot";
   const STORAGE_TYPE = "snapmark_type";
+  const FEEDBACK_FORM_URL =
+    "https://docs.google.com/forms/d/e/1FAIpQLScJZ2tJnltWvPLGOu0JIXio7V6lReIwOWa4-fRC8_k7YwB1EA/viewform?usp=dialog";
 
   const canvas = document.getElementById("board");
   const ctx = canvas.getContext("2d");
@@ -13,6 +15,7 @@
   const btnCopy = document.getElementById("btn-copy");
   const btnDownload = document.getElementById("btn-download");
   const copyToast = document.getElementById("copy-toast");
+  const btnFeedback = document.getElementById("btn-feedback");
   const sidebarTools = document.getElementById("sidebar-tools");
   const annotateContextPanel = document.getElementById("annotate-context-panel");
   const mockupContextPanel = document.getElementById("mockup-context-panel");
@@ -2071,6 +2074,12 @@
       showCopyToastMessage(false);
     }
   });
+
+  if (btnFeedback) {
+    btnFeedback.addEventListener("click", () => {
+      window.open(FEEDBACK_FORM_URL, "_blank");
+    });
+  }
 
   document.querySelectorAll(".sidebar-tool[data-tool]").forEach((btn) => {
     btn.addEventListener("click", () => setTool(/** @type {HTMLElement} */ (btn).dataset.tool || "select"));
