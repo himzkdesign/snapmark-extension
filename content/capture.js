@@ -88,7 +88,7 @@
     );
     if (totalWidth > window.innerWidth + 1) {
       console.warn(
-        "[SnapMark] Page scroll width exceeds viewport width;",
+        "[Snappd] Page scroll width exceeds viewport width;",
         totalWidth,
         "px — vertical stitch only; ensure page is fully visible horizontally."
       );
@@ -96,7 +96,7 @@
     const clampedCaptureHeight = Math.max(1, Math.min(docScrollHeight, MAX_CANVAS_HEIGHT));
     if (docScrollHeight > MAX_CANVAS_HEIGHT) {
       console.warn(
-        "[SnapMark] Page height exceeds max canvas height; clamping to",
+        "[Snappd] Page height exceeds max canvas height; clamping to",
         MAX_CANVAS_HEIGHT,
         "px"
       );
@@ -174,7 +174,7 @@
         sendResponse({ ok: true, dataUrl });
       })
       .catch((err) => {
-        console.error("[SnapMark] captureFullPage", err);
+        console.error("[Snappd] captureFullPage", err);
         sendResponse({ ok: false, error: String(err?.message || err) });
       });
   }

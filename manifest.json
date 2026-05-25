@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SnapMark",
+  "name": "Snappd",
   "version": "1.0.0",
   "description": "Capture and annotate any webpage.",
   "permissions": ["activeTab", "scripting", "tabs", "storage"],

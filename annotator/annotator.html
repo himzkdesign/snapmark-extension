@@ -3,334 +3,178 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SnapMark — Annotator</title>
+    <title>Snappd — Annotator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="annotator.css" />
   </head>
   <body>
-    <header id="top-bar" class="top-bar" aria-label="SnapMark toolbar">
-      <div class="top-bar__left">
-        <span class="top-bar__wordmark">SnapMark</span>
-        <button type="button" id="btn-undo" class="top-bar__history-btn" title="Undo" aria-label="Undo">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M9 14L5 10l4-4M5 10h11.5a4.5 4.5 0 010 9H13"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+    <header id="top-bar" class="top-bar" aria-label="Snappd toolbar">
+      <div class="top-bar__group top-bar__group--left">
+        <span class="top-bar__wordmark">Snappd</span>
+        <span class="top-bar__divider" aria-hidden="true"></span>
+        <input
+          type="text"
+          id="filename-input"
+          class="top-bar__filename"
+          value=""
+          aria-label="Export filename"
+          spellcheck="false"
+        />
+        <span class="top-bar__divider" aria-hidden="true"></span>
+        <button type="button" id="btn-undo" class="top-bar__icon-btn" title="Undo" aria-label="Undo">
+          <span class="top-bar__icon-slot" data-lucide="undo-2"></span>
         </button>
-        <button type="button" id="btn-redo" class="top-bar__history-btn" title="Redo" aria-label="Redo">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M15 14l4-4-4-4M19 10H7.5a4.5 4.5 0 000 9H11"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+        <button type="button" id="btn-redo" class="top-bar__icon-btn" title="Redo" aria-label="Redo">
+          <span class="top-bar__icon-slot" data-lucide="redo-2"></span>
         </button>
       </div>
-      <div class="top-bar__center" aria-hidden="true"></div>
-      <div class="top-bar__right">
-        <button type="button" id="btn-copy" class="top-bar__btn-copy">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <rect x="9" y="4" width="10" height="14" rx="2" stroke="currentColor" stroke-width="1.4" />
-            <path
-              d="M7 8H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-1"
-              stroke="currentColor"
-              stroke-width="1.4"
-              stroke-linecap="round"
-            />
-          </svg>
+      <div class="top-bar__spacer" aria-hidden="true"></div>
+      <div class="top-bar__group top-bar__group--right">
+        <span class="top-bar__divider" aria-hidden="true"></span>
+        <button type="button" id="btn-help" class="top-bar__icon-btn" title="Help" aria-label="Help">
+          <span class="top-bar__icon-slot" data-lucide="circle-help"></span>
+        </button>
+        <span class="top-bar__divider" aria-hidden="true"></span>
+        <button type="button" id="btn-copy" class="top-bar__btn top-bar__btn--ghost">
+          <span class="top-bar__icon-slot" data-lucide="copy"></span>
           <span>Copy</span>
         </button>
-        <button type="button" id="btn-download" class="top-bar__btn-download">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M12 4v12m0 0l-4-4m4 4l4-4M6 20h12"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+        <button type="button" id="btn-download" class="top-bar__btn top-bar__btn--primary">
           <span>Download PNG</span>
         </button>
       </div>
     </header>
 
-    <aside
-      id="mockup-context-panel"
-      class="mockup-context-panel"
-      inert
-      aria-hidden="true"
-      aria-label="Mockup device and background"
-    >
-      <div class="mockup-context-panel__body">
-        <p class="mockup-context-panel__section-label">DEVICE FRAME</p>
-        <div class="mockup-context-panel__device-row" role="group" aria-label="Device frame">
-          <button type="button" class="mockup-context-panel__device-btn is-active" data-device="none" aria-pressed="true">
-            <span class="mockup-context-panel__device-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.2" />
-              </svg>
-            </span>
-            <span class="mockup-context-panel__device-label">None</span>
-          </button>
-          <button type="button" class="mockup-context-panel__device-btn" data-device="browser" aria-pressed="false">
-            <span class="mockup-context-panel__device-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="4.5" cy="5" r="1.25" fill="currentColor" />
-                <circle cx="8" cy="5" r="1.25" fill="currentColor" />
-                <circle cx="11.5" cy="5" r="1.25" fill="currentColor" />
-                <path d="M2.5 8h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
-              </svg>
-            </span>
-            <span class="mockup-context-panel__device-label">Browser</span>
-          </button>
-          <button type="button" class="mockup-context-panel__device-btn" data-device="border" aria-pressed="false">
-            <span class="mockup-context-panel__device-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="2.5" y="3.5" width="11" height="9" rx="2" stroke="currentColor" stroke-width="1.2" />
-              </svg>
-            </span>
-            <span class="mockup-context-panel__device-label">Border</span>
-          </button>
-        </div>
-
-        <div class="mockup-context-panel__divider" role="presentation"></div>
-
-        <p class="mockup-context-panel__section-label">RADIUS</p>
-        <div class="mockup-context-panel__pill-row" role="group" aria-label="Corner radius">
-          <button type="button" class="mockup-context-panel__pill-btn is-active" data-radius="0">None</button>
-          <button type="button" class="mockup-context-panel__pill-btn" data-radius="8">Small</button>
-          <button type="button" class="mockup-context-panel__pill-btn" data-radius="16">Medium</button>
-          <button type="button" class="mockup-context-panel__pill-btn" data-radius="24">iOS</button>
-        </div>
-
-        <div id="mockup-border-width-section" class="mockup-context-panel__border-width-section" hidden>
-          <p class="mockup-context-panel__section-label">BORDER WIDTH</p>
-          <div class="mockup-context-panel__border-width-row">
-            <input
-              type="range"
-              id="mockup-border-width"
-              class="mockup-context-panel__border-width-slider"
-              min="1"
-              max="20"
-              step="1"
-              value="2"
-              aria-label="Border width"
-            />
-            <span id="mockup-border-width-value" class="mockup-context-panel__border-width-value" aria-live="polite">2px</span>
-          </div>
-        </div>
-
-        <div class="mockup-context-panel__divider" role="presentation"></div>
-
-        <p class="mockup-context-panel__section-label">SHADOW</p>
-        <div class="mockup-context-panel__pill-row" role="group" aria-label="Shadow">
-          <button type="button" class="mockup-context-panel__pill-btn is-active" data-shadow="none">None</button>
-          <button type="button" class="mockup-context-panel__pill-btn" data-shadow="soft">Soft</button>
-          <button type="button" class="mockup-context-panel__pill-btn" data-shadow="medium">Medium</button>
-          <button type="button" class="mockup-context-panel__pill-btn" data-shadow="hard">Hard</button>
-        </div>
-
-        <div class="mockup-context-panel__divider" role="presentation"></div>
-
-        <p class="mockup-context-panel__section-label">BACKGROUND</p>
-        <div class="mockup-context-panel__bg-swatches" role="group" aria-label="Background">
-          <button
-            type="button"
-            class="mockup-context-panel__bg-swatch mockup-context-panel__bg-swatch--border"
-            data-bg="#ffffff"
-            style="--mockup-bg: #ffffff"
-            aria-label="White"
-          ></button>
-          <button type="button" class="mockup-context-panel__bg-swatch is-active mockup-context-panel__bg-swatch--border" data-bg="#f5f5f5" style="--mockup-bg: #f5f5f5" aria-label="Light"></button>
-          <button type="button" class="mockup-context-panel__bg-swatch mockup-context-panel__bg-swatch--border" data-bg="#e0e0e0" style="--mockup-bg: #e0e0e0" aria-label="Gray"></button>
-          <button type="button" class="mockup-context-panel__bg-swatch" data-bg="#1a1a1a" style="--mockup-bg: #1a1a1a" aria-label="Dark"></button>
-          <button type="button" class="mockup-context-panel__bg-swatch mockup-context-panel__bg-swatch--gradient" data-bg="gradient-blue" aria-label="Gradient blue"></button>
-          <button type="button" class="mockup-context-panel__bg-swatch mockup-context-panel__bg-swatch--gradient" data-bg="gradient-pink" aria-label="Gradient pink"></button>
-        </div>
-
-        <div class="mockup-context-panel__divider" role="presentation"></div>
-
-        <p class="mockup-context-panel__section-label">PADDING</p>
-        <div class="mockup-context-panel__pill-row mockup-context-panel__pill-row--pad" role="group" aria-label="Padding">
-          <button type="button" class="mockup-context-panel__pill-btn" data-padding="24">S</button>
-          <button type="button" class="mockup-context-panel__pill-btn is-active" data-padding="48">M</button>
-          <button type="button" class="mockup-context-panel__pill-btn" data-padding="80">L</button>
-        </div>
-
-        <div class="mockup-context-panel__divider" role="presentation"></div>
-
-        <button type="button" id="mockup-apply-btn" class="mockup-context-panel__apply-btn">Apply Mockup</button>
-
-        <div id="mockup-reset-row" class="mockup-context-panel__reset-row" hidden>
-          <button type="button" id="mockup-reset-link" class="mockup-context-panel__reset-link">Reset</button>
-        </div>
-      </div>
-    </aside>
-
-    <aside
-      id="annotate-context-panel"
-      class="annotate-context-panel"
-      inert
-      aria-hidden="true"
-      aria-label="Annotate help and pin color"
-    >
-      <div class="annotate-context-panel__body">
-        <p class="annotate-context-panel__section-label">HOW TO USE</p>
-        <p class="annotate-context-panel__instruction">
-          Click anywhere on the screenshot to drop an annotation pin. Or drag to highlight a specific area.
-        </p>
-        <div class="annotate-context-panel__divider" role="presentation"></div>
-
-        <p class="annotate-context-panel__section-label annotate-context-panel__section-label--spaced">PIN COLOR</p>
-        <div class="annotate-context-panel__swatches" role="listbox" aria-label="Pin color">
-          <button
-            type="button"
-            class="annotate-context-panel__swatch is-active"
-            data-color="#FF4444"
-            style="--swatch: #ff4444"
-            aria-selected="true"
-          ></button>
-          <button type="button" class="annotate-context-panel__swatch" data-color="#FFB800" style="--swatch: #ffb800" aria-selected="false"></button>
-          <button type="button" class="annotate-context-panel__swatch" data-color="#00C853" style="--swatch: #00c853" aria-selected="false"></button>
-          <button type="button" class="annotate-context-panel__swatch" data-color="#2979FF" style="--swatch: #2979ff" aria-selected="false"></button>
-          <button
-            type="button"
-            class="annotate-context-panel__swatch annotate-context-panel__swatch--light"
-            data-color="#ffffff"
-            style="--swatch: #ffffff"
-            aria-selected="false"
-          ></button>
-        </div>
-        <p class="annotate-context-panel__color-hint">
-          Each annotation uses the color selected at the time it's placed.
-        </p>
-        <div class="annotate-context-panel__divider annotate-context-panel__divider--section" role="presentation"></div>
-
-        <p class="annotate-context-panel__section-label">KEYBOARD</p>
-        <div class="annotate-context-panel__shortcuts">
-          <div class="annotate-context-panel__shortcut-row">
-            <kbd class="annotate-context-panel__key-badge">A</kbd>
-            <span class="annotate-context-panel__shortcut-label">Annotate tool</span>
-          </div>
-          <div class="annotate-context-panel__shortcut-row">
-            <kbd class="annotate-context-panel__key-badge">V</kbd>
-            <span class="annotate-context-panel__shortcut-label">Select tool</span>
-          </div>
-          <div class="annotate-context-panel__shortcut-row">
-            <kbd class="annotate-context-panel__key-badge">M</kbd>
-            <span class="annotate-context-panel__shortcut-label">Mockup tool</span>
-          </div>
-          <div class="annotate-context-panel__shortcut-row">
-            <kbd class="annotate-context-panel__key-badge">⌘Z</kbd>
-            <span class="annotate-context-panel__shortcut-label">Undo</span>
-          </div>
-        </div>
-      </div>
-    </aside>
-
     <div id="app-main" class="app-main">
       <div id="sidebar-shell" class="sidebar-shell">
-        <aside
-          id="sidebar-tools"
-          class="sidebar-tools sidebar-tools--select-active"
-          aria-label="Tools"
-        >
-          <div class="sidebar-tools__tools">
-            <button type="button" class="sidebar-tool is-active" data-tool="select" aria-pressed="true" aria-keyshortcuts="v">
-              <span class="sidebar-tool__icon" aria-hidden="true">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M12 8v8M8 12h8M9.5 8L12 4l2.5 4M9.5 16l2.5 4 2.5-4M8 9.5L4 12l4 2.5M16 9.5l4 2.5-4 2.5"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </span>
-              <span class="sidebar-tool__label">Select</span>
-            </button>
-            <button type="button" class="sidebar-tool" data-tool="mockup" aria-pressed="false" aria-keyshortcuts="m">
-              <span class="sidebar-tool__icon" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="4" y="5" width="16" height="12" rx="2.5" stroke="currentColor" stroke-width="1.5" />
-                  <path d="M9 21h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                  <path d="M12 17v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                </svg>
-              </span>
-              <span class="sidebar-tool__label">Mockup</span>
-            </button>
-            <div class="sidebar-annotate-slot">
-              <button type="button" class="sidebar-tool" data-tool="annotate" aria-pressed="false" aria-keyshortcuts="a">
-                <span class="sidebar-tool__icon" aria-hidden="true">
-                  <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4" />
-                    <circle cx="8" cy="8" r="1.8" fill="currentColor" />
-                  </svg>
-                </span>
-                <span class="sidebar-tool__label">Annotate</span>
-              </button>
+        <nav id="sidebar-tools" class="sidebar-tools" aria-label="Tools">
+          <button type="button" class="sidebar-tool" data-tool="select" aria-pressed="false" aria-keyshortcuts="v">
+            <span class="sidebar-tool__icon" data-lucide="mouse-pointer-2"></span>
+            <span class="sidebar-tool__label">Select</span>
+          </button>
+          <button type="button" class="sidebar-tool is-active" data-tool="annotate" aria-pressed="true" aria-keyshortcuts="a">
+            <span class="sidebar-tool__icon" data-lucide="circle-fading-plus"></span>
+            <span class="sidebar-tool__label">Annotate</span>
+          </button>
+          <button type="button" class="sidebar-tool" data-tool="blur" aria-pressed="false" aria-keyshortcuts="b">
+            <span class="sidebar-tool__icon" data-lucide="blend"></span>
+            <span class="sidebar-tool__label">Blur</span>
+          </button>
+          <button type="button" class="sidebar-tool" data-tool="measure" aria-pressed="false" aria-keyshortcuts="d">
+            <span class="sidebar-tool__icon" data-lucide="ruler"></span>
+            <span class="sidebar-tool__label">Measure</span>
+          </button>
+          <button type="button" class="sidebar-tool" data-tool="mockup" aria-pressed="false" aria-keyshortcuts="m">
+            <span class="sidebar-tool__icon" data-lucide="monitor-smartphone"></span>
+            <span class="sidebar-tool__label">Mockup</span>
+          </button>
+        </nav>
+      </div>
+
+      <div id="flyout-bridge" class="flyout-bridge" hidden aria-hidden="true"></div>
+
+      <div id="tool-flyouts" class="tool-flyouts">
+        <div class="tool-flyout" id="flyout-select" data-flyout="select" hidden>
+          <p class="tool-flyout__label">SELECT</p>
+          <p class="tool-flyout__hint">Click shapes to move them. Legacy vector annotations from earlier captures.</p>
+        </div>
+
+        <div class="tool-flyout" id="flyout-annotate" data-flyout="annotate" hidden>
+          <p class="tool-flyout__label">ANNOTATE</p>
+          <p class="tool-flyout__hint">Click to drop a pin and add a note. Drag to highlight an area.</p>
+          <p class="tool-flyout__hint tool-flyout__hint--kbd"><kbd>Enter</kbd> save · <kbd>Esc</kbd> cancel</p>
+        </div>
+
+        <div class="tool-flyout" id="flyout-blur" data-flyout="blur" hidden>
+          <p class="tool-flyout__label">BLUR INTENSITY</p>
+          <div class="tool-flyout__range-row">
+            <input type="range" id="blur-intensity" min="2" max="30" step="1" value="10" aria-label="Blur intensity" />
+            <input type="number" id="blur-intensity-num" min="2" max="30" step="1" value="10" aria-label="Blur intensity px" />
+            <span class="tool-flyout__unit">px</span>
+          </div>
+          <p class="tool-flyout__hint">Drag to create a blur region. Hover to move or resize. <kbd>Delete</kbd> removes.</p>
+        </div>
+
+        <div class="tool-flyout" id="flyout-measure" data-flyout="measure" hidden>
+          <p class="tool-flyout__label">MEASURE</p>
+          <p class="tool-flyout__hint">Hover to inspect regions. Click to pin element A, then B. <kbd>Esc</kbd> resets.</p>
+        </div>
+
+        <div class="tool-flyout tool-flyout--wide" id="flyout-mockup" data-flyout="mockup" hidden>
+          <p class="tool-flyout__label">DEVICE FRAME</p>
+          <div class="mockup-device-row" role="group" aria-label="Device frame">
+            <button type="button" class="mockup-device-btn is-active" data-device="none" aria-pressed="true">None</button>
+            <button type="button" class="mockup-device-btn" data-device="browser" aria-pressed="false">Browser</button>
+            <button type="button" class="mockup-device-btn" data-device="border" aria-pressed="false">Border</button>
+          </div>
+
+          <div id="mockup-advanced-sections">
+            <div class="tool-flyout__divider" role="presentation"></div>
+            <p class="tool-flyout__label">RADIUS</p>
+            <div class="mockup-pill-row" role="group" aria-label="Corner radius">
+              <button type="button" class="mockup-pill-btn is-active" data-radius="0">None</button>
+              <button type="button" class="mockup-pill-btn" data-radius="8">Small</button>
+              <button type="button" class="mockup-pill-btn" data-radius="16">Medium</button>
+              <button type="button" class="mockup-pill-btn" data-radius="24">iOS</button>
+            </div>
+
+            <div id="mockup-border-width-section" class="mockup-border-section" hidden>
+              <p class="tool-flyout__label">BORDER WIDTH</p>
+              <div class="tool-flyout__range-row">
+                <input type="range" id="mockup-border-width" min="0" max="20" step="1" value="2" aria-label="Border width" />
+                <input type="number" id="mockup-border-width-num" min="0" max="20" step="1" value="2" aria-label="Border width px" />
+                <span class="tool-flyout__unit">px</span>
+              </div>
+            </div>
+
+            <div class="tool-flyout__divider" role="presentation"></div>
+            <p class="tool-flyout__label">SHADOW</p>
+            <div class="mockup-pill-row" role="group" aria-label="Shadow">
+              <button type="button" class="mockup-pill-btn is-active" data-shadow="none">None</button>
+              <button type="button" class="mockup-pill-btn" data-shadow="soft">Soft</button>
+              <button type="button" class="mockup-pill-btn" data-shadow="medium">Med</button>
+              <button type="button" class="mockup-pill-btn" data-shadow="hard">Hard</button>
             </div>
           </div>
-          <div class="sidebar-tools__spacer" aria-hidden="true"></div>
-          <div class="sidebar-feedback">
-            <button
-              type="button"
-              id="btn-feedback"
-              class="sidebar-feedback__btn"
-              aria-label="Help and feedback"
-              aria-describedby="sidebar-feedback-tooltip"
-            >
-              <span class="sidebar-feedback__surface" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9.25" stroke="currentColor" stroke-width="1.5" />
-                  <path
-                    d="M9.75 9.75a2.25 2.25 0 114.5 0c0 1.5-1.125 2.25-2.25 3M12 17h.01"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </span>
-              <span class="sidebar-feedback__label">Help</span>
-            </button>
-            <span id="sidebar-feedback-tooltip" class="sidebar-feedback__tooltip" role="tooltip">Give feedback</span>
+
+          <div class="tool-flyout__divider" role="presentation"></div>
+          <p class="tool-flyout__label">BACKGROUND</p>
+          <div class="mockup-bg-row" role="group" aria-label="Background">
+            <button type="button" class="mockup-bg-swatch" data-bg="#ffffff" style="--mockup-bg: #ffffff" aria-label="White"></button>
+            <button type="button" class="mockup-bg-swatch is-active" data-bg="#f5f5f5" style="--mockup-bg: #f5f5f5" aria-label="Light"></button>
+            <button type="button" class="mockup-bg-swatch" data-bg="#e0e0e0" style="--mockup-bg: #e0e0e0" aria-label="Gray"></button>
+            <button type="button" class="mockup-bg-swatch mockup-bg-swatch--dark" data-bg="#1a1a1a" style="--mockup-bg: #1a1a1a" aria-label="Dark"></button>
+            <button type="button" class="mockup-bg-swatch mockup-bg-swatch--gradient" data-bg="gradient-blue" aria-label="Gradient blue"></button>
+            <button type="button" class="mockup-bg-swatch mockup-bg-swatch--gradient" data-bg="gradient-pink" aria-label="Gradient pink"></button>
           </div>
-        </aside>
+
+          <div class="tool-flyout__divider" role="presentation"></div>
+          <p class="tool-flyout__label">PADDING</p>
+          <div class="mockup-pill-row" role="group" aria-label="Padding">
+            <button type="button" class="mockup-pill-btn" data-padding="24">S</button>
+            <button type="button" class="mockup-pill-btn is-active" data-padding="48">M</button>
+            <button type="button" class="mockup-pill-btn" data-padding="80">L</button>
+          </div>
+
+          <button type="button" id="mockup-reset-btn" class="mockup-reset-btn">
+            <span class="mockup-reset-btn__icon" data-lucide="rotate-ccw"></span>
+            <span>Reset</span>
+          </button>
+        </div>
       </div>
 
       <main id="canvas-area" class="canvas-area">
         <div class="canvas-scroll">
           <div class="canvas-stack" id="canvas-stack">
             <canvas id="board" width="800" height="600" aria-label="Screenshot canvas"></canvas>
-            <svg
-              id="annotation-connectors"
-              class="annotation-connectors"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            ></svg>
+            <svg id="annotation-connectors" class="annotation-connectors" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
             <div id="annotation-cards" class="annotation-cards"></div>
+            <div id="measure-overlay" class="measure-overlay" aria-hidden="true"></div>
           </div>
         </div>
       </main>
@@ -338,6 +182,7 @@
 
     <div id="copy-toast" class="copy-toast" role="status" aria-live="polite" hidden></div>
 
+    <script src="../lib/lucide-icons.js"></script>
     <script src="../lib/screenshot-idb.js"></script>
     <script src="annotator.js"></script>
   </body>

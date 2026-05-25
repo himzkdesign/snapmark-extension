@@ -9,32 +9,45 @@
   const canvasStack = document.getElementById("canvas-stack");
   const svgConnectors = document.getElementById("annotation-connectors");
   const annotationCardsRoot = document.getElementById("annotation-cards");
+  const measureOverlay = document.getElementById("measure-overlay");
 
+  const filenameInput = document.getElementById("filename-input");
   const btnUndo = document.getElementById("btn-undo");
   const btnRedo = document.getElementById("btn-redo");
   const btnCopy = document.getElementById("btn-copy");
   const btnDownload = document.getElementById("btn-download");
+  const btnHelp = document.getElementById("btn-help");
   const copyToast = document.getElementById("copy-toast");
-  const btnFeedback = document.getElementById("btn-feedback");
   const sidebarTools = document.getElementById("sidebar-tools");
-  const annotateContextPanel = document.getElementById("annotate-context-panel");
-  const mockupContextPanel = document.getElementById("mockup-context-panel");
-  const mockupApplyBtn = document.getElementById("mockup-apply-btn");
-  const mockupResetRow = document.getElementById("mockup-reset-row");
-  const mockupResetLink = document.getElementById("mockup-reset-link");
+  const flyoutBridge = document.getElementById("flyout-bridge");
+  const toolFlyouts = document.getElementById("tool-flyouts");
+  const mockupAdvancedSections = document.getElementById("mockup-advanced-sections");
   const mockupBorderWidthSection = document.getElementById("mockup-border-width-section");
   const mockupBorderWidthInput = document.getElementById("mockup-border-width");
-  const mockupBorderWidthValue = document.getElementById("mockup-border-width-value");
+  const mockupBorderWidthNum = document.getElementById("mockup-border-width-num");
+  const mockupResetBtn = document.getElementById("mockup-reset-btn");
+  const blurIntensityInput = document.getElementById("blur-intensity");
+  const blurIntensityNum = document.getElementById("blur-intensity-num");
 
-  const CATEGORIES = ["UI", "Copy", "Bug", "Idea", "Question"];
+  const CATEGORY_OPTIONS = [
+    { value: "", label: "No category", color: "#9CA3AF" },
+    { value: "UI", label: "UI", color: "#22C55E" },
+    { value: "Copy", label: "Copy", color: "#3B82F6" },
+    { value: "Bug", label: "Bug", color: "#EC4899" },
+    { value: "Question", label: "Question", color: "#F97316" },
+  ];
+
   const SVG_NS = "http://www.w3.org/2000/svg";
   const PIN_R = 16;
-  /** Outer radius of white ring behind the colored pin disk. */
   const PIN_RING_R = 19;
-  /** Distance from pin center for grab hit-test and hover (px). */
   const PIN_HIT_DIST = 22;
-  /** Card width in stack/CSS pixels — must match `.annotation-card { width }`. */
-  const CARD_WIDTH_STACK_PX = 220;
+  const CARD_WIDTH_EDIT_PX = 250;
+  const CARD_GAP_PX = 8;
+  const BLUR_INTENSITY_MIN = 2;
+  const BLUR_INTENSITY_MAX = 30;
+  const BLUR_INTENSITY_DEFAULT = 10;
+  const BLUR_HANDLE_HIT = 8;
+  const MEASURE_TOLERANCE = 28;
 
   /** @type {HTMLImageElement | null} */
   let baseImage = null;
@@ -43,9 +56,11 @@
   /** @type {Array<object>} */
   let annotations = [];
   let nextAnnotationId = 1;
+  /** @type {number | null} */
+  let editingAnnotationId = null;
 
-  /** @type {'select'|'annotate'|'mockup'} */
-  let currentTool = "select";
+  /** @type {'select'|'annotate'|'blur'|'measure'|'mockup'} */
+  let currentTool = "annotate";
 
   let mockupState = {
     device: /** @type {'none'|'browser'|'border'} */ ("none"),
@@ -54,8 +69,43 @@
     background: "#f5f5f5",
     padding: 48,
     borderWidth: 2,
-    applied: false,
   };
+
+  /** @type {Array<{id:number,x:number,y:number,w:number,h:number}>} */
+  let blurRegions = [];
+  let nextBlurRegionId = 1;
+  let blurIntensity = BLUR_INTENSITY_DEFAULT;
+  /** @type {number | null} */
+  let hoveredBlurRegionId = null;
+  /** @type {number | null} */
+  let selectedBlurRegionId = null;
+  let blurDragActive = false;
+  let blurDragStartX = 0;
+  let blurDragStartY = 0;
+  let blurDragCurX = 0;
+  let blurDragCurY = 0;
+  /** @type {'move'|'resize-nw'|'resize-ne'|'resize-sw'|'resize-se'|'resize-n'|'resize-s'|'resize-e'|'resize-w'|null} */
+  let blurHandleMode = null;
+  /** @type {{id:number,startX:number,startY:number,startRect:{x:number,y:number,w:number,h:number}}|null} */
+  let blurEditState = null;
+
+  /** @type {Uint8ClampedArray|null} */
+  let measurePixelData = null;
+  let measurePixelW = 0;
+  let measurePixelH = 0;
+  /** @type {{x:number,y:number,w:number,h:number}|null} */
+  let measureHoverBounds = null;
+  /** @type {{x:number,y:number,w:number,h:number}|null} */
+  let measurePinA = null;
+  /** @type {{x:number,y:number,w:number,h:number}|null} */
+  let measurePinB = null;
+  /** @type {{x:number,y:number,w:number,h:number}|null} */
+  let measureHoverB = null;
+
+  let flyoutHideTimer = 0;
+  let flyoutHoverCount = 0;
+  /** @type {HTMLElement|null} */
+  let blurTrashEl = null;
 
   /** Canonical original screenshot PNG (from canvas after first paint) — mockup preview/reset source. */
   let originalImageData = "";
@@ -63,7 +113,6 @@
   let originalCaptureH = 0;
   /** Top-left of screenshot content in canvas space for current mockup preview (offset for annotations). */
   let lastMockupScreenshotOrigin = { x: 0, y: 0 };
-  let color = "#FF4444";
   let strokeWidth = 1;
   /** @type {number | null} */
   let selectedIndex = null;
@@ -71,9 +120,6 @@
   let isSelectDragging = false;
   /** @type {{dx:number,dy:number} | null} */
   let selectOffset = null;
-
-  /** @type {{ann: object, startClientX: number, startClientY: number, startOx: number, startOy: number} | null} */
-  let cardDragState = null;
 
   let annotatePlaceActive = false;
   let annotatePlaceDragging = false;
@@ -110,6 +156,57 @@
     return { x, y, width: Math.abs(x1 - x0), height: Math.abs(y1 - y0) };
   }
 
+  function normalizeBlurRect(x0, y0, x1, y1) {
+    const n = normalizeRect(x0, y0, x1, y1);
+    return { x: n.x, y: n.y, w: n.width, h: n.height };
+  }
+
+  function injectLucideIcons() {
+    if (typeof lucideIcon !== "function") return;
+    document.querySelectorAll("[data-lucide]").forEach((el) => {
+      const name = el.getAttribute("data-lucide");
+      if (!name) return;
+      const size = el.classList.contains("sidebar-tool__icon") ? 20 : 16;
+      el.innerHTML = lucideIcon(name, size);
+    });
+  }
+
+  function defaultExportFilename() {
+    const d = new Date();
+    const month = d.toLocaleString("en-US", { month: "long" });
+    const day = d.getDate();
+    return `Screenshot – ${month} ${day}`;
+  }
+
+  function sanitizeFilename(name) {
+    const trimmed = (name || "").trim() || defaultExportFilename();
+    return trimmed
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 120) || "Screenshot";
+  }
+
+  function categoryColor(cat) {
+    const found = CATEGORY_OPTIONS.find((c) => c.value === (cat || ""));
+    return found ? found.color : "#9CA3AF";
+  }
+
+  function categoryLabel(cat) {
+    const found = CATEGORY_OPTIONS.find((c) => c.value === (cat || ""));
+    return found ? found.label : "No category";
+  }
+
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+      if (img.complete && img.naturalWidth) resolve(img);
+    });
+  }
+
   /** @param {object} ann */
   function serializeAnnotation(ann) {
     return {
@@ -117,17 +214,22 @@
       pinX: ann.pinX,
       pinY: ann.pinY,
       color: ann.color,
-      category: ann.category,
+      category: ann.category ?? "",
       text: ann.text || "",
-      confirmed: !!ann.confirmed,
+      saved: !!ann.saved,
       hasRect: !!ann.hasRect,
       rectX: ann.rectX,
       rectY: ann.rectY,
       rectW: ann.rectW,
       rectH: ann.rectH,
+      cardSide: ann.cardSide || "right",
       cardOffsetX: ann.cardOffsetX,
       cardOffsetY: ann.cardOffsetY,
     };
+  }
+
+  function serializeBlurRegion(b) {
+    return { id: b.id, x: b.x, y: b.y, w: b.w, h: b.h };
   }
 
   function captureState() {
@@ -135,33 +237,50 @@
       shapes: JSON.parse(JSON.stringify(shapes)),
       annData: annotations.map(serializeAnnotation),
       nextId: nextAnnotationId,
+      blurRegions: blurRegions.map(serializeBlurRegion),
+      nextBlurRegionId,
+      blurIntensity,
+      mockupState: JSON.parse(JSON.stringify(mockupState)),
       baseDataUrl: baseImage && baseImage.src ? baseImage.src : "",
       canvasW: canvas.width,
       canvasH: canvas.height,
-      mockupApplied: mockupState.applied,
       mockupOriginX: lastMockupScreenshotOrigin.x,
       mockupOriginY: lastMockupScreenshotOrigin.y,
     };
   }
 
   function rebuildAnnotationsFromData(annData) {
+    editingAnnotationId = null;
     annotationCardsRoot.replaceChildren();
     annotations = annData.map((d) => {
       const ann = { ...d };
+      ann.saved = ann.saved ?? ann.confirmed ?? false;
+      ann.category = ann.category ?? "";
+      ann.color = ann.color || categoryColor(ann.category);
       const el = buildCardElement(ann);
       ann._el = el;
       annotationCardsRoot.appendChild(el);
-      positionCard(ann);
       return ann;
     });
+    for (const ann of annotations) {
+      positionCard(ann);
+    }
   }
 
   function restoreState(snap) {
-    mockupState.applied = snap.mockupApplied === true;
+    if (snap.mockupState && typeof snap.mockupState === "object") {
+      mockupState = { ...mockupState, ...snap.mockupState };
+    }
     lastMockupScreenshotOrigin = {
       x: typeof snap.mockupOriginX === "number" ? snap.mockupOriginX : 0,
       y: typeof snap.mockupOriginY === "number" ? snap.mockupOriginY : 0,
     };
+    blurRegions = Array.isArray(snap.blurRegions)
+      ? snap.blurRegions.map((b) => ({ ...b }))
+      : [];
+    nextBlurRegionId =
+      typeof snap.nextBlurRegionId === "number" ? snap.nextBlurRegionId : nextBlurRegionId;
+    syncBlurIntensityControls(snap.blurIntensity);
 
     const cw =
       typeof snap.canvasW === "number"
@@ -185,21 +304,27 @@
       isRestoringHistory = false;
     }
     selectedIndex = null;
+    selectedBlurRegionId = null;
+    hoveredBlurRegionId = null;
     annotatePlaceActive = false;
     annotatePlaceDragging = false;
     isDraggingPin = false;
     draggedAnnotationId = null;
+    resetMeasureState();
 
     let restored = false;
     function finishRestore() {
       if (restored) return;
       restored = true;
+      rebuildMeasurePixelCache();
       redraw();
       updateConnectorsSVG();
       positionAllCards();
       updateUndoRedoButtons();
       applyCanvasCursorLast();
-      updateMockupResetRow();
+      syncMockupPanelFromState();
+      renderMeasureOverlay();
+      hideBlurTrash();
     }
 
     if (!url) {
@@ -258,6 +383,389 @@
     }
   }
 
+  function clampBlurIntensity(raw) {
+    const n = Number(raw);
+    return Math.max(
+      BLUR_INTENSITY_MIN,
+      Math.min(BLUR_INTENSITY_MAX, Number.isFinite(n) ? n : BLUR_INTENSITY_DEFAULT)
+    );
+  }
+
+  function syncBlurIntensityControls(raw) {
+    const v = clampBlurIntensity(raw ?? blurIntensity);
+    blurIntensity = v;
+    if (blurIntensityInput) blurIntensityInput.value = String(v);
+    if (blurIntensityNum) blurIntensityNum.value = String(v);
+  }
+
+  function showFlyout(tool) {
+    window.clearTimeout(flyoutHideTimer);
+    if (flyoutBridge) {
+      flyoutBridge.hidden = false;
+      flyoutBridge.setAttribute("aria-hidden", "false");
+    }
+    document.querySelectorAll(".tool-flyout[data-flyout]").forEach((el) => {
+      el.hidden = el.getAttribute("data-flyout") !== tool;
+    });
+  }
+
+  function scheduleHideFlyout() {
+    window.clearTimeout(flyoutHideTimer);
+    flyoutHideTimer = window.setTimeout(() => {
+      if (flyoutHoverCount > 0) return;
+      document.querySelectorAll(".tool-flyout[data-flyout]").forEach((el) => {
+        el.hidden = true;
+      });
+      if (flyoutBridge) {
+        flyoutBridge.hidden = true;
+        flyoutBridge.setAttribute("aria-hidden", "true");
+      }
+    }, 150);
+  }
+
+  function onFlyoutZoneEnter() {
+    flyoutHoverCount += 1;
+    window.clearTimeout(flyoutHideTimer);
+  }
+
+  function onFlyoutZoneLeave() {
+    flyoutHoverCount = Math.max(0, flyoutHoverCount - 1);
+    scheduleHideFlyout();
+  }
+
+  function setupFlyoutHover() {
+    if (sidebarTools) {
+      sidebarTools.addEventListener("mouseenter", (e) => {
+        const btn = e.target instanceof Element ? e.target.closest(".sidebar-tool[data-tool]") : null;
+        if (btn && btn.dataset.tool) showFlyout(btn.dataset.tool);
+      });
+    }
+    if (flyoutBridge) {
+      flyoutBridge.addEventListener("mouseenter", onFlyoutZoneEnter);
+      flyoutBridge.addEventListener("mouseleave", onFlyoutZoneLeave);
+    }
+    if (toolFlyouts) {
+      toolFlyouts.addEventListener("mouseenter", onFlyoutZoneEnter);
+      toolFlyouts.addEventListener("mouseleave", onFlyoutZoneLeave);
+    }
+  }
+
+  function resetMeasureState() {
+    measurePinA = null;
+    measurePinB = null;
+    measureHoverBounds = null;
+    measureHoverB = null;
+    renderMeasureOverlay();
+  }
+
+  function rebuildMeasurePixelCache() {
+    measurePixelData = null;
+    if (!originalImageData || !originalCaptureW || !originalCaptureH) return;
+    const tmp = document.createElement("canvas");
+    tmp.width = originalCaptureW;
+    tmp.height = originalCaptureH;
+    const tctx = tmp.getContext("2d");
+    if (!tctx) return;
+    const img = new Image();
+    img.onload = () => {
+      tctx.drawImage(img, 0, 0);
+      const data = tctx.getImageData(0, 0, originalCaptureW, originalCaptureH);
+      measurePixelData = data.data;
+      measurePixelW = originalCaptureW;
+      measurePixelH = originalCaptureH;
+    };
+    img.src = originalImageData;
+  }
+
+  function measureColorAt(px, py) {
+    if (!measurePixelData) return null;
+    const i = (py * measurePixelW + px) * 4;
+    return [measurePixelData[i], measurePixelData[i + 1], measurePixelData[i + 2], measurePixelData[i + 3]];
+  }
+
+  function colorDist(a, b) {
+    return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) + Math.abs(a[3] - b[3]);
+  }
+
+  function floodFillBounds(canvasX, canvasY) {
+    if (!measurePixelData || !measurePixelW) return null;
+    const ox = lastMockupScreenshotOrigin.x;
+    const oy = lastMockupScreenshotOrigin.y;
+    const cw = Math.max(1, canvas.width - ox);
+    const ch = Math.max(1, canvas.height - oy);
+    const px = Math.max(
+      0,
+      Math.min(measurePixelW - 1, Math.floor(((canvasX - ox) / cw) * measurePixelW))
+    );
+    const py = Math.max(
+      0,
+      Math.min(measurePixelH - 1, Math.floor(((canvasY - oy) / ch) * measurePixelH))
+    );
+    const seed = measureColorAt(px, py);
+    if (!seed || seed[3] < 8) return null;
+    const visited = new Uint8Array(measurePixelW * measurePixelH);
+    const stack = [px, py];
+    let minX = px;
+    let maxX = px;
+    let minY = py;
+    let maxY = py;
+    let count = 0;
+    const maxPixels = measurePixelW * measurePixelH;
+    while (stack.length && count < maxPixels) {
+      const y = stack.pop();
+      const x = stack.pop();
+      if (x == null || y == null) continue;
+      const idx = y * measurePixelW + x;
+      if (visited[idx]) continue;
+      const c = measureColorAt(x, y);
+      if (!c || colorDist(c, seed) > MEASURE_TOLERANCE) continue;
+      visited[idx] = 1;
+      count += 1;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      if (x > 0) stack.push(x - 1, y);
+      if (x < measurePixelW - 1) stack.push(x + 1, y);
+      if (y > 0) stack.push(x, y - 1);
+      if (y < measurePixelH - 1) stack.push(x, y + 1);
+    }
+    const bx = ox + (minX / measurePixelW) * cw;
+    const by = oy + (minY / measurePixelH) * ch;
+    const bw = ((maxX - minX + 1) / measurePixelW) * cw;
+    const bh = ((maxY - minY + 1) / measurePixelH) * ch;
+    return { x: bx, y: by, w: bw, h: bh };
+  }
+
+  function boundsToOverlayStyle(b) {
+    if (!canvasStack || !b) return {};
+    const stack = canvasStack.getBoundingClientRect();
+    const sw = stack.width / canvas.width;
+    const sh = stack.height / canvas.height;
+    return {
+      left: `${b.x * sw}px`,
+      top: `${b.y * sh}px`,
+      width: `${b.w * sw}px`,
+      height: `${b.h * sh}px`,
+    };
+  }
+
+  function renderMeasureOverlay() {
+    if (!measureOverlay) return;
+    measureOverlay.replaceChildren();
+    if (currentTool !== "measure") {
+      measureOverlay.setAttribute("aria-hidden", "true");
+      return;
+    }
+    measureOverlay.setAttribute("aria-hidden", "false");
+    const addHighlight = (b, extraClass) => {
+      const el = document.createElement("div");
+      el.className = `measure-overlay__highlight${extraClass ? ` ${extraClass}` : ""}`;
+      Object.assign(el.style, boundsToOverlayStyle(b));
+      measureOverlay.appendChild(el);
+    };
+    const addTooltip = (b, text) => {
+      const tip = document.createElement("div");
+      tip.className = "measure-overlay__tooltip";
+      tip.textContent = text;
+      const st = boundsToOverlayStyle(b);
+      tip.style.left = `calc(${st.left} + ${parseFloat(st.width) / 2}px)`;
+      tip.style.top = st.top;
+      measureOverlay.appendChild(tip);
+    };
+    if (measureHoverBounds && !measurePinA) {
+      addHighlight(measureHoverBounds, "");
+      addTooltip(
+        measureHoverBounds,
+        `${Math.round(measureHoverBounds.w)}×${Math.round(measureHoverBounds.h)}`
+      );
+    }
+    if (measurePinA) addHighlight(measurePinA, "");
+    if (measureHoverB && measurePinA && !measurePinB) {
+      addHighlight(measureHoverB, "measure-overlay__highlight--b");
+      drawMeasureSpacing(measurePinA, measureHoverB);
+    }
+    if (measurePinA && measurePinB) {
+      addHighlight(measurePinB, "measure-overlay__highlight--b");
+      drawMeasureSpacing(measurePinA, measurePinB);
+    }
+  }
+
+  function drawMeasureSpacing(a, b) {
+    if (!measureOverlay || !canvasStack) return;
+    const stack = canvasStack.getBoundingClientRect();
+    const sw = stack.width / canvas.width;
+    const sh = stack.height / canvas.height;
+    const ax = a.x + a.w / 2;
+    const ay = a.y + a.h / 2;
+    const bx = b.x + b.w / 2;
+    const by = b.y + b.h / 2;
+    const wrap = document.createElement("div");
+    wrap.className = "measure-overlay__spacing";
+    wrap.style.left = "0";
+    wrap.style.top = "0";
+    wrap.style.width = `${stack.width}px`;
+    wrap.style.height = `${stack.height}px`;
+    const hGap = Math.abs(bx - ax);
+    const vGap = Math.abs(by - ay);
+    if (hGap >= 2) {
+      const line = document.createElement("div");
+      line.className = "measure-overlay__spacing-line";
+      const left = Math.min(ax, bx) * sw;
+      const top = ay * sh;
+      line.style.left = `${left}px`;
+      line.style.top = `${top}px`;
+      line.style.width = `${hGap * sw}px`;
+      line.style.height = "2px";
+      wrap.appendChild(line);
+      const lbl = document.createElement("div");
+      lbl.className = "measure-overlay__spacing-label";
+      lbl.textContent = `${Math.round(hGap)}px`;
+      lbl.style.left = `${left + (hGap * sw) / 2}px`;
+      lbl.style.top = `${top - 18}px`;
+      lbl.style.transform = "translateX(-50%)";
+      wrap.appendChild(lbl);
+    }
+    if (vGap >= 2) {
+      const line = document.createElement("div");
+      line.className = "measure-overlay__spacing-line";
+      const left = ax * sw;
+      const top = Math.min(ay, by) * sh;
+      line.style.left = `${left}px`;
+      line.style.top = `${top}px`;
+      line.style.width = "2px";
+      line.style.height = `${vGap * sh}px`;
+      wrap.appendChild(line);
+      const lbl = document.createElement("div");
+      lbl.className = "measure-overlay__spacing-label";
+      lbl.textContent = `${Math.round(vGap)}px`;
+      lbl.style.left = `${left + 8}px`;
+      lbl.style.top = `${top + (vGap * sh) / 2}px`;
+      lbl.style.transform = "translateY(-50%)";
+      wrap.appendChild(lbl);
+    }
+    measureOverlay.appendChild(wrap);
+  }
+
+  function removeBlurRegion(id) {
+    const i = blurRegions.findIndex((b) => b.id === id);
+    if (i >= 0) blurRegions.splice(i, 1);
+    if (selectedBlurRegionId === id) selectedBlurRegionId = null;
+    if (hoveredBlurRegionId === id) hoveredBlurRegionId = null;
+    hideBlurTrash();
+    redraw();
+    commitHistory();
+  }
+
+  function hideBlurTrash() {
+    if (blurTrashEl) {
+      blurTrashEl.remove();
+      blurTrashEl = null;
+    }
+  }
+
+  function showBlurTrash(region) {
+    hideBlurTrash();
+    if (!canvasStack || currentTool !== "blur") return;
+    const stack = canvasStack.getBoundingClientRect();
+    const sw = stack.width / canvas.width;
+    const sh = stack.height / canvas.height;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "blur-trash-btn";
+    btn.setAttribute("aria-label", "Delete blur region");
+    if (typeof lucideIcon === "function") {
+      btn.innerHTML = lucideIcon("trash-2", 16, "#ef4444");
+    }
+    btn.style.left = `${(region.x + region.w) * sw - 14}px`;
+    btn.style.top = `${region.y * sh - 14}px`;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeBlurRegion(region.id);
+    });
+    canvasStack.appendChild(btn);
+    blurTrashEl = btn;
+  }
+
+  function pickBlurRegion(px, py) {
+    for (let i = blurRegions.length - 1; i >= 0; i--) {
+      const r = blurRegions[i];
+      if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) return r.id;
+    }
+    return null;
+  }
+
+  function blurHandleAt(px, py, r) {
+    const hs = [
+      { mode: "resize-nw", x: r.x, y: r.y },
+      { mode: "resize-ne", x: r.x + r.w, y: r.y },
+      { mode: "resize-sw", x: r.x, y: r.y + r.h },
+      { mode: "resize-se", x: r.x + r.w, y: r.y + r.h },
+      { mode: "resize-n", x: r.x + r.w / 2, y: r.y },
+      { mode: "resize-s", x: r.x + r.w / 2, y: r.y + r.h },
+      { mode: "resize-w", x: r.x, y: r.y + r.h / 2 },
+      { mode: "resize-e", x: r.x + r.w, y: r.y + r.h / 2 },
+    ];
+    for (const h of hs) {
+      if (Math.hypot(px - h.x, py - h.y) <= BLUR_HANDLE_HIT) return h.mode;
+    }
+    if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) return "move";
+    return null;
+  }
+
+  function drawBlurChrome(c, r, hovered) {
+    c.save();
+    c.setLineDash([6, 4]);
+    c.strokeStyle = hovered ? "#6d28d9" : "rgba(109,40,217,0.6)";
+    c.lineWidth = 2;
+    c.strokeRect(r.x, r.y, r.w, r.h);
+    c.setLineDash([]);
+    if (hovered || selectedBlurRegionId === r.id) {
+      const pts = [
+        [r.x, r.y],
+        [r.x + r.w, r.y],
+        [r.x, r.y + r.h],
+        [r.x + r.w, r.y + r.h],
+        [r.x + r.w / 2, r.y],
+        [r.x + r.w / 2, r.y + r.h],
+        [r.x, r.y + r.h / 2],
+        [r.x + r.w, r.y + r.h / 2],
+      ];
+      c.fillStyle = "#ffffff";
+      c.strokeStyle = "#6d28d9";
+      for (const [hx, hy] of pts) {
+        c.fillRect(hx - 4, hy - 4, 8, 8);
+        c.strokeRect(hx - 4, hy - 4, 8, 8);
+      }
+    }
+    c.restore();
+  }
+
+  function drawBaseLayersBeforeBlur(c) {
+    c.clearRect(0, 0, canvas.width, canvas.height);
+    if (baseImage) c.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
+    for (const s of shapes) drawCommittedShape(s, c);
+    for (const ann of annotations) drawCommittedAnnotationRect(c, ann);
+  }
+
+  function applyBlurRegionToCtx(destCtx, sourceCanvas, region) {
+    const { x, y, w, h } = region;
+    if (w < 1 || h < 1) return;
+    destCtx.save();
+    destCtx.beginPath();
+    destCtx.rect(x, y, w, h);
+    destCtx.clip();
+    destCtx.filter = `blur(${blurIntensity}px)`;
+    destCtx.drawImage(sourceCanvas, 0, 0);
+    destCtx.restore();
+  }
+
+  function applyAllBlurRegionsToCtx(destCtx, sourceCanvas) {
+    for (const region of blurRegions) {
+      applyBlurRegionToCtx(destCtx, sourceCanvas, region);
+    }
+  }
+
   let lastCanvasPointer = { x: 0, y: 0, valid: false };
 
   function applyCanvasCursorFromCoords(px, py) {
@@ -267,11 +775,31 @@
       canvas.style.cursor = "default";
       return;
     }
+    if (currentTool === "blur") {
+      const id = pickBlurRegion(px, py);
+      if (id != null) {
+        const r = blurRegions.find((b) => b.id === id);
+        if (r && blurHandleAt(px, py, r)) {
+          canvas.style.cursor = "pointer";
+          return;
+        }
+      }
+      canvas.style.cursor = "crosshair";
+      return;
+    }
+    if (currentTool === "measure") {
+      canvas.style.cursor = "crosshair";
+      return;
+    }
     if (currentTool === "select") {
       canvas.style.cursor = "default";
       return;
     }
     if (currentTool === "annotate") {
+      if (editingAnnotationId != null) {
+        canvas.style.cursor = "default";
+        return;
+      }
       if (isDraggingPin) {
         canvas.style.cursor = "grabbing";
         return;
@@ -455,13 +983,13 @@
     ctx.font = "11px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("snapmark.design", x + totalW / 2, y + barH / 2);
+    ctx.fillText("snappd.app", x + totalW / 2, y + barH / 2);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
   }
 
   function drawMockupBorderFrame(ctx, x, y, sw, sh, r) {
-    const bw = Math.max(1, Math.min(20, Number(mockupState.borderWidth) || 2));
+    const bw = Math.max(0, Math.min(20, Number(mockupState.borderWidth) || 2));
     const rr = r > 0 ? r : 0;
     const outerR = rr > 0 ? rr + bw : 0;
 
@@ -493,6 +1021,10 @@
         ann.rectY += oy;
       }
     }
+    for (const b of blurRegions) {
+      b.x += ox;
+      b.y += oy;
+    }
     for (const s of shapes) {
       if (s.type === "rect" || s.type === "text") {
         s.x += ox;
@@ -506,16 +1038,10 @@
     }
   }
 
-  function updateMockupResetRow() {
-    if (mockupResetRow) {
-      mockupResetRow.hidden = !mockupState.applied;
-    }
-  }
-
   function computeMockupLayout(device, screenshotW, screenshotH, padding) {
     const bw =
       device === "border"
-        ? Math.max(1, Math.min(20, Number(mockupState.borderWidth) || 2))
+        ? Math.max(0, Math.min(20, Number(mockupState.borderWidth) || 2))
         : 0;
     const pad = padding + bw;
     if (device === "browser") {
@@ -650,17 +1176,6 @@
     }
   }
 
-  function applyMockup() {
-    previewMockup(() => {
-      mockupState.applied = true;
-      commitHistory();
-      updateMockupResetRow();
-      setTimeout(() => {
-        setTool("select");
-      }, 300);
-    });
-  }
-
   function resetMockup() {
     if (!originalImageData) return;
 
@@ -674,7 +1189,6 @@
       background: "#f5f5f5",
       padding: 48,
       borderWidth: 2,
-      applied: false,
     };
 
     let done = false;
@@ -686,27 +1200,16 @@
       positionAllCards();
       syncMockupPanelFromState();
       commitHistory();
-      updateMockupResetRow();
     }
 
-    const img = new Image();
-    img.onload = () => {
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      baseImage = img;
-      finish();
-    };
-    img.onerror = () => {
-      syncMockupPanelFromState();
-      updateMockupResetRow();
-    };
-    img.src = originalImageData;
-    if (img.complete && img.naturalWidth) {
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      baseImage = img;
-      finish();
-    }
+    loadImage(originalImageData)
+      .then((img) => {
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        baseImage = img;
+        finish();
+      })
+      .catch(() => syncMockupPanelFromState());
   }
 
   const ANNOTATE_RECT_RADIUS = 6;
@@ -843,13 +1346,14 @@
 
   function drawLiveAnnotateRectPreview(x0, y0, x1, y1) {
     const n = normalizeRect(x0, y0, x1, y1);
+    const previewColor = categoryColor("UI");
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     beginAnnotationRoundRectPath(ctx, n.x, n.y, n.width, n.height);
-    ctx.fillStyle = hexWithAlphaByte(color, "1f");
+    ctx.fillStyle = hexWithAlphaByte(previewColor, "1f");
     ctx.fill();
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = previewColor;
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
     ctx.stroke();
@@ -875,7 +1379,7 @@
     c.shadowBlur = 0;
     c.shadowOffsetX = 0;
     c.shadowOffsetY = 0;
-    c.font = '800 14px "Geist Mono", ui-monospace, monospace';
+    c.font = '700 11px "Figtree", system-ui, sans-serif';
     c.textAlign = "center";
     c.textBaseline = "middle";
     c.fillStyle = "#ffffff";
@@ -904,36 +1408,19 @@
     return { x: cx, y: ry + rh };
   }
 
-  /** When true, card anchors to the right of the pin; when false, to the left (Figma-style). */
-  function annotationCardBranchLeft(ann) {
-    const cw = canvas.width;
-    if (ann.hasRect) {
-      return ann.rectX + ann.rectW / 2 < cw / 2;
-    }
-    return ann.pinX < cw / 2;
-  }
-
   /**
-   * Drag-to-area: horizontal dashed line from pin to nearest vertical side of the card.
-   * Click-only: nearest point on card border (may be diagonal).
+   * Connector end on card border for 4-direction placement.
    * @param {object} ann
    * @param {{ left: number; top: number; width: number; height: number }} cr
    */
   function connectorEndOnCard(ann, cr) {
-    if (!ann.hasRect) {
-      return nearestPointOnRectBorder(ann.pinX, ann.pinY, cr.left, cr.top, cr.width, cr.height);
-    }
-    const yClamped = Math.max(cr.top, Math.min(cr.top + cr.height, ann.pinY));
-    const px = ann.pinX;
-    if (px <= cr.left) {
-      return { x: cr.left, y: yClamped };
-    }
-    if (px >= cr.left + cr.width) {
-      return { x: cr.left + cr.width, y: yClamped };
-    }
-    const dL = Math.abs(px - cr.left);
-    const dR = Math.abs(px - (cr.left + cr.width));
-    return dL <= dR ? { x: cr.left, y: yClamped } : { x: cr.left + cr.width, y: yClamped };
+    const side = ann.cardSide || "right";
+    const yMid = cr.top + cr.height / 2;
+    const xMid = cr.left + cr.width / 2;
+    if (side === "right") return { x: cr.left, y: Math.max(cr.top, Math.min(cr.top + cr.height, ann.pinY)) };
+    if (side === "left") return { x: cr.left + cr.width, y: Math.max(cr.top, Math.min(cr.top + cr.height, ann.pinY)) };
+    if (side === "bottom") return { x: Math.max(cr.left, Math.min(cr.left + cr.width, ann.pinX)), y: cr.top };
+    return { x: Math.max(cr.left, Math.min(cr.left + cr.width, ann.pinX)), y: cr.top + cr.height };
   }
 
   function stackPxToCanvasX(px, sw) {
@@ -1015,7 +1502,7 @@
     const sh = stack.height || 1;
     const el = getAnnotationCardElement(ann);
     if (!el) {
-      const w = (CARD_WIDTH_STACK_PX / sw) * canvas.width;
+      const w = (CARD_WIDTH_EDIT_PX / sw) * canvas.width;
       const h = measureExportCardContentHeight(c, ann, w, layoutScale);
       return {
         left: ann.pinX + ann.cardOffsetX,
@@ -1038,40 +1525,104 @@
     };
   }
 
-  function computeSmartCardOffsets(ann) {
+  function cardRectsOverlap(a, b, pad) {
+    return !(
+      a.left + a.width + pad <= b.left ||
+      b.left + b.width + pad <= a.left ||
+      a.top + a.height + pad <= b.top ||
+      b.top + b.height + pad <= a.top
+    );
+  }
+
+  function getOtherCardRectsCanvas(excludeId) {
+    const rects = [];
+    for (const other of annotations) {
+      if (other.id === excludeId) continue;
+      const el = getAnnotationCardElement(other);
+      if (!el || !canvasStack) continue;
+      const stack = canvasStack.getBoundingClientRect();
+      const sw = stack.width || 1;
+      const sh = stack.height || 1;
+      const br = el.getBoundingClientRect();
+      rects.push({
+        left: ((br.left - stack.left) / sw) * canvas.width,
+        top: ((br.top - stack.top) / sh) * canvas.height,
+        width: (br.width / sw) * canvas.width,
+        height: (br.height / sh) * canvas.height,
+      });
+    }
+    return rects;
+  }
+
+  function computeSmartCardPlacement(ann) {
     if (!canvasStack) return;
     const stack = canvasStack.getBoundingClientRect();
     const sw = stack.width || 1;
     const sh = stack.height || 1;
-    const cw = canvas.width;
-    const ch = canvas.height;
+    const gap = stackPxToCanvasX(CARD_GAP_PX, sw);
+    const gapY = stackPxToCanvasY(CARD_GAP_PX, sh);
+    const el = getAnnotationCardElement(ann);
+    const cardW = el ? el.offsetWidth : CARD_WIDTH_EDIT_PX;
+    const cardH = el ? el.offsetHeight : 100;
+    const cardWCanvas = (cardW / sw) * canvas.width;
+    const cardHCanvas = (cardH / sh) * canvas.height;
+    const margin = stackPxToCanvasX(8, sw);
+    const overlapPad = stackPxToCanvasX(8, sw);
+    const otherRects = getOtherCardRectsCanvas(ann.id);
+    const sides = ["right", "left", "bottom", "top"];
+    const placements = {
+      right: { ox: gap, oy: -cardHCanvas / 2, side: "right" },
+      left: { ox: -(cardWCanvas + gap), oy: -cardHCanvas / 2, side: "left" },
+      bottom: { ox: -cardWCanvas / 2, oy: gapY, side: "bottom" },
+      top: { ox: -cardWCanvas / 2, oy: -(cardHCanvas + gapY), side: "top" },
+    };
 
-    const cardWCanvas = stackPxToCanvasX(CARD_WIDTH_STACK_PX, sw);
-    const gapStackPx = ann.hasRect ? 16 : 20;
-    const gapXCanvas = stackPxToCanvasX(gapStackPx, sw);
-    const gapYCanvas = stackPxToCanvasY(20, sh);
-
-    let cardHCanvas;
-    const cardEl = getAnnotationCardElement(ann);
-    if (cardEl) {
-      const br = cardEl.getBoundingClientRect();
-      cardHCanvas = (br.height / sh) * ch;
-    } else {
-      cardHCanvas = stackPxToCanvasY(120, sh);
+    function fitsWithoutOverlap(left, top) {
+      if (
+        left < margin ||
+        top < margin ||
+        left + cardWCanvas > canvas.width - margin ||
+        top + cardHCanvas > canvas.height - margin
+      ) {
+        return false;
+      }
+      const mine = { left, top, width: cardWCanvas, height: cardHCanvas };
+      for (const other of otherRects) {
+        if (cardRectsOverlap(mine, other, overlapPad)) return false;
+      }
+      return true;
     }
 
-    const branchLeft = annotationCardBranchLeft(ann);
-    let ox = branchLeft ? gapXCanvas : -(cardWCanvas + gapXCanvas);
-    const oy = -gapYCanvas;
+    for (const side of sides) {
+      const p = placements[side];
+      const left = ann.pinX + p.ox;
+      const top = ann.pinY + p.oy;
+      if (fitsWithoutOverlap(left, top)) {
+        ann.cardSide = p.side;
+        ann.cardOffsetX = left - ann.pinX;
+        ann.cardOffsetY = top - ann.pinY;
+        return;
+      }
+    }
 
-    let cardLeft = ann.pinX + ox;
-    let cardTop = ann.pinY + oy;
-    const maxLeft = Math.max(0, cw - cardWCanvas);
-    const maxTop = Math.max(0, ch - cardHCanvas);
-    cardLeft = Math.max(0, Math.min(cardLeft, maxLeft));
-    cardTop = Math.max(0, Math.min(cardTop, maxTop));
-    ann.cardOffsetX = cardLeft - ann.pinX;
-    ann.cardOffsetY = cardTop - ann.pinY;
+    const p = placements.right;
+    ann.cardSide = p.side;
+    let left = Math.max(margin, Math.min(ann.pinX + p.ox, canvas.width - cardWCanvas - margin));
+    let top = Math.max(margin, Math.min(ann.pinY + p.oy, canvas.height - cardHCanvas - margin));
+    for (let nudge = 0; nudge < 12; nudge++) {
+      const mine = { left, top, width: cardWCanvas, height: cardHCanvas };
+      let hit = false;
+      for (const other of otherRects) {
+        if (cardRectsOverlap(mine, other, overlapPad)) {
+          top = Math.min(top + overlapPad, canvas.height - cardHCanvas - margin);
+          hit = true;
+          break;
+        }
+      }
+      if (!hit) break;
+    }
+    ann.cardOffsetX = left - ann.pinX;
+    ann.cardOffsetY = top - ann.pinY;
   }
 
   /**
@@ -1079,7 +1630,7 @@
    * @param {{ animate?: boolean } | undefined} [opts]
    */
   function repositionCard(ann, opts) {
-    computeSmartCardOffsets(ann);
+    computeSmartCardPlacement(ann);
     const animate = !!(opts && opts.animate);
     if (animate && ann._el) {
       const el = /** @type {HTMLElement & { _pinAnimTimer?: number }} */ (ann._el);
@@ -1106,7 +1657,7 @@
   function getCardRectCanvas(ann) {
     const el = getAnnotationCardElement(ann);
     if (!el || !canvasStack) {
-      const w = (CARD_WIDTH_STACK_PX / (canvasStack?.clientWidth || 1)) * canvas.width;
+      const w = (CARD_WIDTH_EDIT_PX / (canvasStack?.clientWidth || 1)) * canvas.width;
       const h = (140 / (canvasStack?.clientHeight || 1)) * canvas.height;
       return {
         left: ann.pinX + ann.cardOffsetX,
@@ -1171,9 +1722,9 @@
     const badgeFont = Math.max(13, 10) * layoutScale;
     const badgePad = 6 * layoutScale;
     c.font = `500 ${badgeFont}px "Geist Mono", ui-monospace, monospace`;
-    const badgeText = ann.category || "UI";
-    const minBadgeW = (60 / CARD_WIDTH_STACK_PX) * w;
-    const maxBadgeW = (140 / CARD_WIDTH_STACK_PX) * w;
+    const badgeText = categoryLabel(ann.category) || "UI";
+    const minBadgeW = (60 / CARD_WIDTH_EDIT_PX) * w;
+    const maxBadgeW = (140 / CARD_WIDTH_EDIT_PX) * w;
     const textW = c.measureText(badgeText).width + badgePad * 2;
     const bw = Math.min(
       maxBadgeW,
@@ -1237,15 +1788,8 @@
     out.height = canvas.height;
     const c = out.getContext("2d");
     const layoutScale = getCanvasCssToBitmapScaleX();
-    if (baseImage) {
-      c.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
-    }
-    for (const s of shapes) {
-      drawCommittedShape(s, c);
-    }
-    for (const ann of annotations) {
-      drawCommittedAnnotationRect(c, ann);
-    }
+    drawBaseLayersBeforeBlur(c);
+    applyAllBlurRegionsToCtx(c, out);
     for (const ann of annotations) {
       drawAnnotationPinOnCtx(c, ann);
       const cr = getCardRectCanvasForExport(ann, c, layoutScale);
@@ -1257,18 +1801,22 @@
   }
 
   function redraw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (baseImage) {
-      ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
-    }
-    for (const s of shapes) {
-      drawCommittedShape(s, ctx);
-    }
-    for (const ann of annotations) {
-      drawCommittedAnnotationRect(ctx, ann);
-    }
+    drawBaseLayersBeforeBlur(ctx);
+    applyAllBlurRegionsToCtx(ctx, canvas);
     if (annotatePlaceActive && annotatePlaceDragging && currentTool === "annotate") {
       drawLiveAnnotateRectPreview(annotateStartX, annotateStartY, annotateCurX, annotateCurY);
+    }
+    if (blurDragActive && currentTool === "blur") {
+      const n = normalizeBlurRect(blurDragStartX, blurDragStartY, blurDragCurX, blurDragCurY);
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = "#6d28d9";
+      ctx.strokeRect(n.x, n.y, n.w, n.h);
+      ctx.restore();
+    }
+    for (const region of blurRegions) {
+      const hovered = region.id === hoveredBlurRegionId || region.id === selectedBlurRegionId;
+      drawBlurChrome(ctx, region, hovered);
     }
     for (const ann of annotations) {
       drawAnnotationPinOnCtx(ctx, ann);
@@ -1277,6 +1825,7 @@
       drawSelectionChrome(shapes[selectedIndex]);
     }
     updateConnectorsSVG();
+    renderMeasureOverlay();
   }
 
   function updateConnectorsSVG() {
@@ -1303,47 +1852,14 @@
   }
 
   function positionCard(ann) {
-    if (!ann._el || !annotationCardsRoot) return;
-    const canvasRect = canvas.getBoundingClientRect();
-    const scaleX = canvasRect.width / canvas.width;
-    const scaleY = canvasRect.height / canvas.height;
-    const pinScreenX = canvasRect.left + ann.pinX * scaleX;
-    const pinScreenY = canvasRect.top + ann.pinY * scaleY;
+    if (!ann._el || !annotationCardsRoot || !canvasStack) return;
+    computeSmartCardPlacement(ann);
+    const stack = canvasStack.getBoundingClientRect();
     const cardsRect = annotationCardsRoot.getBoundingClientRect();
-
-    const stack = canvasStack && canvasStack.getBoundingClientRect();
-    const sw = (stack && stack.width) || canvasRect.width || 1;
-    const sh = (stack && stack.height) || canvasRect.height || 1;
-    const gapStackPx = ann.hasRect ? 16 : 20;
-    const gapXCanvas = stackPxToCanvasX(gapStackPx, sw);
-    const cardWCanvas = stackPxToCanvasX(CARD_WIDTH_STACK_PX, sw);
-    const branchLeft = annotationCardBranchLeft(ann);
-    const anchorOx = branchLeft ? gapXCanvas : -(cardWCanvas + gapXCanvas);
-    const anchorOy = -stackPxToCanvasY(20, sh);
-
-    const cardW = ann._el.offsetWidth || CARD_WIDTH_STACK_PX;
-    const cardH = ann._el.offsetHeight || 1;
-    const gapScreenX = ann.hasRect ? 16 : 20;
-    const cardViewportLeft = branchLeft
-      ? pinScreenX + gapScreenX
-      : pinScreenX - cardW - gapScreenX;
-    const cardViewportTop = pinScreenY - 20;
-
-    const rawViewportLeft = cardViewportLeft + (ann.cardOffsetX - anchorOx) * scaleX;
-    const rawViewportTop = cardViewportTop + (ann.cardOffsetY - anchorOy) * scaleY;
-    const minVL = canvasRect.left + 8;
-    const maxVL = canvasRect.right - cardW - 8;
-    const minVT = canvasRect.top + 8;
-    const maxVT = canvasRect.bottom - cardH - 8;
-    const clampedVL =
-      maxVL >= minVL ? Math.max(minVL, Math.min(rawViewportLeft, maxVL)) : rawViewportLeft;
-    const clampedVT =
-      maxVT >= minVT ? Math.max(minVT, Math.min(rawViewportTop, maxVT)) : rawViewportTop;
-    ann.cardOffsetX += (clampedVL - rawViewportLeft) / scaleX;
-    ann.cardOffsetY += (clampedVT - rawViewportTop) / scaleY;
-
-    const left = clampedVL - cardsRect.left;
-    const top = clampedVT - cardsRect.top;
+    const sw = stack.width / canvas.width;
+    const sh = stack.height / canvas.height;
+    const left = ann.pinX * sw + ann.cardOffsetX * sw;
+    const top = ann.pinY * sh + ann.cardOffsetY * sh;
     ann._el.style.left = `${Math.round(left)}px`;
     ann._el.style.top = `${Math.round(top)}px`;
   }
@@ -1357,23 +1873,88 @@
   function removeAnnotation(ann) {
     const i = annotations.indexOf(ann);
     if (i >= 0) annotations.splice(i, 1);
+    if (editingAnnotationId === ann.id) editingAnnotationId = null;
     if (ann._el) ann._el.remove();
     redraw();
     commitHistory();
   }
 
-  function syncCategoryStyle(selectEl, ann) {
-    const tc = badgeTextColor(ann.color);
-    selectEl.style.backgroundColor = ann.color;
-    selectEl.style.color = tc;
-    selectEl.style.backgroundImage = `url("${categoryChevronUrl(tc === "#111111")}")`;
+  function pickAnnotationAt(px, py) {
+    for (let i = annotations.length - 1; i >= 0; i--) {
+      const ann = annotations[i];
+      if (Math.hypot(px - ann.pinX, py - ann.pinY) <= PIN_HIT_DIST) return ann;
+    }
+    return null;
   }
 
-  function truncatePreviewLabel(text, maxLen) {
-    const t = (text || "").replace(/\s+/g, " ").trim();
-    if (!t) return "";
-    if (t.length <= maxLen) return t;
-    return `${t.slice(0, maxLen)}…`;
+  function startEditingAnnotation(ann) {
+    editingAnnotationId = ann.id;
+    if (ann._el) {
+      ann._el.classList.remove("is-saved");
+      ann._el.classList.add("annotation-card--editing");
+      const ta = ann._el.querySelector(".annotation-card__body-input");
+      if (ta instanceof HTMLTextAreaElement) {
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+      }
+    }
+    scheduleConnectorUpdate();
+  }
+
+  function saveEditingAnnotation() {
+    const ann = annotations.find((a) => a.id === editingAnnotationId);
+    if (!ann) {
+      editingAnnotationId = null;
+      return;
+    }
+    const ta = ann._el?.querySelector(".annotation-card__body-input");
+    const text = ta instanceof HTMLTextAreaElement ? ta.value.trim() : (ann.text || "").trim();
+    if (!text) {
+      removeAnnotation(ann);
+      editingAnnotationId = null;
+      return;
+    }
+    ann.text = text;
+    ann.saved = true;
+    editingAnnotationId = null;
+    const maxId = annotations.reduce((m, a) => Math.max(m, a.id), 0);
+    nextAnnotationId = maxId + 1;
+    if (ann._el) {
+      ann._el.classList.remove("annotation-card--editing");
+      ann._el.classList.add("is-saved");
+      const saved = ann._el.querySelector(".annotation-card__saved-text");
+      if (saved) saved.textContent = ann.text;
+    }
+    repositionCard(ann);
+    redraw();
+    commitHistory();
+  }
+
+  function cancelEditingAnnotation() {
+    const ann = annotations.find((a) => a.id === editingAnnotationId);
+    if (!ann) {
+      editingAnnotationId = null;
+      return;
+    }
+    if (!ann.saved) {
+      removeAnnotation(ann);
+    } else {
+      editingAnnotationId = null;
+      if (ann._el) {
+        ann._el.classList.remove("annotation-card--editing");
+        ann._el.classList.add("is-saved");
+      }
+    }
+    redraw();
+  }
+
+  function updateCategoryPillUI(ann) {
+    const pill = ann._el?.querySelector(".annotation-card__category-pill");
+    if (!pill) return;
+    pill.style.backgroundColor = ann.color;
+    pill.style.color = "#ffffff";
+    const label = pill.querySelector(".annotation-card__category-label");
+    if (label) label.textContent = categoryLabel(ann.category);
   }
 
   let connectorRaf = 0;
@@ -1388,248 +1969,145 @@
     const card = document.createElement("div");
     card.className = "annotation-card";
     card.dataset.annotationId = String(ann.id);
-
-    const statusDot = document.createElement("span");
-    statusDot.className = "annotation-card__status-dot";
-    statusDot.setAttribute("aria-hidden", "true");
+    if (ann.saved) card.classList.add("is-saved");
+    else card.classList.add("annotation-card--editing");
 
     const header = document.createElement("div");
     header.className = "annotation-card__header";
 
-    const dragZone = document.createElement("div");
-    dragZone.className = "annotation-card__drag";
-    const grip = document.createElement("div");
-    grip.className = "annotation-card__drag-handle";
-    grip.title = "Drag";
-    const gripSvg = document.createElementNS(SVG_NS, "svg");
-    gripSvg.setAttribute("width", "12");
-    gripSvg.setAttribute("height", "16");
-    gripSvg.setAttribute("viewBox", "0 0 12 16");
-    gripSvg.setAttribute("aria-hidden", "true");
-    const gripDots = [
-      [3.5, 3],
-      [8.5, 3],
-      [3.5, 8],
-      [8.5, 8],
-      [3.5, 13],
-      [8.5, 13],
-    ];
-    for (const [cx, cy] of gripDots) {
-      const dot = document.createElementNS(SVG_NS, "circle");
-      dot.setAttribute("cx", String(cx));
-      dot.setAttribute("cy", String(cy));
-      dot.setAttribute("r", "1");
-      dot.setAttribute("fill", "#ccc");
-      gripSvg.appendChild(dot);
+    const catWrap = document.createElement("div");
+    catWrap.className = "annotation-card__category-wrap";
+
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "annotation-card__category-pill";
+    pill.style.backgroundColor = ann.color;
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "annotation-card__category-label";
+    labelSpan.textContent = categoryLabel(ann.category);
+    pill.appendChild(labelSpan);
+    if (typeof lucideIcon === "function") {
+      const chev = document.createElement("span");
+      chev.innerHTML = lucideIcon("chevron-down", 12, "#ffffff");
+      pill.appendChild(chev);
     }
-    grip.appendChild(gripSvg);
-    const select = document.createElement("select");
-    select.className = "annotation-card__category";
-    CATEGORIES.forEach((cat) => {
-      const opt = document.createElement("option");
-      opt.value = cat;
-      opt.textContent = cat;
-      if (cat === ann.category) opt.selected = true;
-      select.appendChild(opt);
+
+    const menu = document.createElement("div");
+    menu.className = "annotation-card__category-menu";
+
+    CATEGORY_OPTIONS.forEach((opt, idx) => {
+      if (idx === 1) {
+        const div = document.createElement("div");
+        div.className = "annotation-card__category-divider";
+        menu.appendChild(div);
+      }
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "annotation-card__category-option";
+      if (ann.category === opt.value) btn.classList.add("is-selected");
+      const check = document.createElement("span");
+      check.className = "check-slot";
+      if (ann.category === opt.value && typeof lucideIcon === "function") {
+        check.innerHTML = lucideIcon("check", 14, "#6d28d9");
+      }
+      btn.appendChild(check);
+      btn.appendChild(document.createTextNode(opt.label));
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        ann.category = opt.value;
+        ann.color = opt.color;
+        menu.classList.remove("is-open");
+        menu.querySelectorAll(".annotation-card__category-option").forEach((el) => {
+          el.classList.toggle("is-selected", el === btn);
+          const cs = el.querySelector(".check-slot");
+          if (cs) cs.innerHTML = el === btn && typeof lucideIcon === "function" ? lucideIcon("check", 14, "#6d28d9") : "";
+        });
+        updateCategoryPillUI(ann);
+        redraw();
+        commitHistory();
+      });
+      menu.appendChild(btn);
     });
-    select.addEventListener("change", () => {
-      ann.category = select.value;
-      scheduleConnectorUpdate();
-      commitHistory();
+
+    pill.addEventListener("click", (e) => {
+      e.stopPropagation();
+      document.querySelectorAll(".annotation-card__category-menu.is-open").forEach((m) => {
+        if (m !== menu) m.classList.remove("is-open");
+      });
+      menu.classList.toggle("is-open");
     });
-    dragZone.appendChild(grip);
-    dragZone.appendChild(select);
+
+    catWrap.appendChild(pill);
+    catWrap.appendChild(menu);
 
     const actions = document.createElement("div");
-    actions.className = "annotation-card__header-actions";
-
-    const menuBtn = document.createElement("button");
-    menuBtn.type = "button";
-    menuBtn.className = "annotation-card__menu";
-    menuBtn.textContent = "⋯";
-    menuBtn.setAttribute("aria-label", "Menu");
-
-    const dropdown = document.createElement("div");
-    dropdown.className = "annotation-card__menu-dropdown";
-
-    const body = document.createElement("div");
-    body.className = "annotation-card__body";
-    body.contentEditable = "true";
-    body.setAttribute("data-placeholder", "Add an annotation...");
-    body.textContent = ann.text || "";
-    let textHistTimer = 0;
-    body.addEventListener("input", () => {
-      ann.text = body.innerText || "";
-      scheduleConnectorUpdate();
-      window.clearTimeout(textHistTimer);
-      textHistTimer = window.setTimeout(() => commitHistory(), 400);
-    });
-
-    const preview = document.createElement("div");
-    preview.className = "annotation-card__preview";
-    preview.setAttribute("aria-hidden", "true");
-
-    const editorWrap = document.createElement("div");
-    editorWrap.className = "annotation-card__editor-wrap";
-    editorWrap.appendChild(body);
-
-    function expandCard() {
-      card.classList.remove("is-confirmed");
-      preview.textContent = "";
-      preview.setAttribute("aria-hidden", "true");
-      editorWrap.removeAttribute("aria-hidden");
-      ann.confirmed = false;
-      scheduleConnectorUpdate();
-      requestAnimationFrame(() => {
-        body.focus();
-        const range = document.createRange();
-        range.selectNodeContents(body);
-        range.collapse(false);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-      });
-    }
-
-    function confirmCard() {
-      ann.text = body.innerText || "";
-      preview.textContent = truncatePreviewLabel(ann.text, 40) || "—";
-      preview.setAttribute("aria-hidden", "false");
-      editorWrap.setAttribute("aria-hidden", "true");
-      body.blur();
-      card.classList.add("is-confirmed");
-      ann.confirmed = true;
-      scheduleConnectorUpdate();
-      commitHistory();
-    }
-
-    body.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        confirmCard();
-      }
-    });
-
-    card.addEventListener("click", (e) => {
-      if (!card.classList.contains("is-confirmed")) return;
-      const t = /** @type {HTMLElement} */ (e.target);
-      if (t.closest(".annotation-card__header-actions")) return;
-      if (t.closest(".annotation-card__drag-handle")) return;
-      if (t.closest("select")) return;
-      expandCard();
-    });
-
-    const miFocus = document.createElement("button");
-    miFocus.type = "button";
-    miFocus.className = "annotation-card__menu-item";
-    miFocus.textContent = "Edit";
-    miFocus.addEventListener("click", (e) => {
-      e.stopPropagation();
-      dropdown.classList.remove("is-open");
-      if (card.classList.contains("is-confirmed")) {
-        expandCard();
-      } else {
-        body.focus();
-      }
-    });
-
-    const miDel = document.createElement("button");
-    miDel.type = "button";
-    miDel.className = "annotation-card__menu-item annotation-card__menu-item--danger";
-    miDel.textContent = "Delete";
-    miDel.addEventListener("click", (e) => {
-      e.stopPropagation();
-      dropdown.classList.remove("is-open");
-      removeAnnotation(ann);
-    });
-
-    dropdown.appendChild(miFocus);
-    dropdown.appendChild(miDel);
-
-    menuBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      document.querySelectorAll(".annotation-card__menu-dropdown.is-open").forEach((d) => {
-        if (d !== dropdown) d.classList.remove("is-open");
-      });
-      dropdown.classList.toggle("is-open");
-    });
-
-    dropdown.addEventListener("mousedown", (e) => e.stopPropagation());
-    dropdown.addEventListener("click", (e) => e.stopPropagation());
-
+    actions.className = "annotation-card__actions";
+    const moreBtn = document.createElement("button");
+    moreBtn.type = "button";
+    moreBtn.className = "annotation-card__icon-btn";
+    moreBtn.setAttribute("aria-label", "More");
+    if (typeof lucideIcon === "function") moreBtn.innerHTML = lucideIcon("ellipsis", 16);
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
-    closeBtn.className = "annotation-card__close";
-    closeBtn.textContent = "×";
-    closeBtn.setAttribute("aria-label", "Close");
+    closeBtn.className = "annotation-card__icon-btn";
+    closeBtn.setAttribute("aria-label", "Remove");
+    if (typeof lucideIcon === "function") closeBtn.innerHTML = lucideIcon("x", 16);
     closeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       removeAnnotation(ann);
     });
-
-    actions.appendChild(menuBtn);
+    actions.appendChild(moreBtn);
     actions.appendChild(closeBtn);
-    actions.appendChild(dropdown);
 
-    header.appendChild(dragZone);
+    header.appendChild(catWrap);
     header.appendChild(actions);
 
-    card.appendChild(statusDot);
+    const editor = document.createElement("div");
+    editor.className = "annotation-card__editor";
+    const textarea = document.createElement("textarea");
+    textarea.className = "annotation-card__body-input";
+    textarea.placeholder = "Add a note…";
+    textarea.value = ann.text || "";
+    textarea.addEventListener("input", () => {
+      ann.text = textarea.value;
+    });
+    textarea.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        editingAnnotationId = ann.id;
+        saveEditingAnnotation();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancelEditingAnnotation();
+      }
+    });
+    editor.appendChild(textarea);
+
+    const savedView = document.createElement("div");
+    savedView.className = "annotation-card__saved-view";
+    const savedText = document.createElement("div");
+    savedText.className = "annotation-card__saved-text";
+    savedText.textContent = ann.text || "";
+    savedView.appendChild(savedText);
+
     card.appendChild(header);
-    card.appendChild(editorWrap);
-    card.appendChild(preview);
+    card.appendChild(editor);
+    card.appendChild(savedView);
 
-    syncCategoryStyle(select, ann);
+    card.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (ann.saved) startEditingAnnotation(ann);
+    });
 
-    if (ann.confirmed) {
-      card.classList.add("is-confirmed");
-      preview.textContent = truncatePreviewLabel(ann.text, 40) || "—";
-      preview.setAttribute("aria-hidden", "false");
-      editorWrap.setAttribute("aria-hidden", "true");
+    if (!ann.saved) {
+      editingAnnotationId = ann.id;
+      requestAnimationFrame(() => textarea.focus());
     }
 
-    function onGripDown(ev) {
-      if (ev.button !== 0) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      document.body.style.cursor = "grabbing";
-      cardDragState = {
-        ann,
-        startClientX: ev.clientX,
-        startClientY: ev.clientY,
-        startOx: ann.cardOffsetX,
-        startOy: ann.cardOffsetY,
-      };
-      document.addEventListener("mousemove", onDocMove);
-      document.addEventListener("mouseup", onDocUp);
-    }
-
-    function onDocMove(ev) {
-      if (!cardDragState || cardDragState.ann !== ann) return;
-      const stack = canvasStack.getBoundingClientRect();
-      const sw = stack.width || 1;
-      const sh = stack.height || 1;
-      const dxPx = ev.clientX - cardDragState.startClientX;
-      const dyPx = ev.clientY - cardDragState.startClientY;
-      const dCanvasX = (dxPx / sw) * canvas.width;
-      const dCanvasY = (dyPx / sh) * canvas.height;
-      ann.cardOffsetX = cardDragState.startOx + dCanvasX;
-      ann.cardOffsetY = cardDragState.startOy + dCanvasY;
+    const ro = new ResizeObserver(() => {
       positionCard(ann);
-      updateConnectorsSVG();
-    }
-
-    function onDocUp() {
-      document.removeEventListener("mousemove", onDocMove);
-      document.removeEventListener("mouseup", onDocUp);
-      document.body.style.cursor = "";
-      cardDragState = null;
-      commitHistory();
-    }
-
-    grip.addEventListener("mousedown", onGripDown);
-
-    const ro = new ResizeObserver(() => scheduleConnectorUpdate());
+      scheduleConnectorUpdate();
+    });
     ro.observe(card);
 
     return card;
@@ -1662,10 +2140,13 @@
       id: nextAnnotationId++,
       pinX,
       pinY,
-      color,
+      color: categoryColor("UI"),
       category: "UI",
       text: "",
-      confirmed: false,
+      saved: false,
+      cardSide: "right",
+      cardOffsetX: 0,
+      cardOffsetY: 0,
     };
     if (rect) {
       ann.hasRect = true;
@@ -1678,17 +2159,13 @@
     const el = buildCardElement(ann);
     ann._el = el;
     annotationCardsRoot.appendChild(el);
+    startEditingAnnotation(ann);
     repositionCard(ann);
     redraw();
-    requestAnimationFrame(() => {
-      repositionCard(ann);
-      redraw();
-      commitHistory();
-    });
   }
 
   document.addEventListener("click", () => {
-    document.querySelectorAll(".annotation-card__menu-dropdown.is-open").forEach((d) => {
+    document.querySelectorAll(".annotation-card__category-menu.is-open").forEach((d) => {
       d.classList.remove("is-open");
     });
   });
@@ -1761,107 +2238,122 @@
       btn.classList.toggle("is-active", is);
       btn.setAttribute("aria-pressed", String(is));
     });
-    if (sidebarTools) {
-      sidebarTools.classList.toggle("sidebar-tools--select-active", next === "select");
+    if (next === "blur") {
+      hideBlurTrash();
+    } else {
+      hoveredBlurRegionId = null;
+      hideBlurTrash();
     }
-    if (annotateContextPanel) {
-      const annOpen = next === "annotate";
-      annotateContextPanel.classList.toggle("annotate-context-panel--open", annOpen);
-      if (!annOpen) {
-        annotateContextPanel.setAttribute("inert", "");
-        annotateContextPanel.setAttribute("aria-hidden", "true");
-      } else {
-        annotateContextPanel.removeAttribute("inert");
-        annotateContextPanel.setAttribute("aria-hidden", "false");
+    if (next !== "measure") resetMeasureState();
+    if (next !== "annotate" && editingAnnotationId != null) {
+      const ann = annotations.find((a) => a.id === editingAnnotationId);
+      if (ann && !ann.saved) cancelEditingAnnotation();
+      else if (ann && ann.saved) {
+        editingAnnotationId = null;
+        if (ann._el) {
+          ann._el.classList.remove("annotation-card--editing");
+          ann._el.classList.add("is-saved");
+        }
       }
     }
-    if (mockupContextPanel) {
-      const muOpen = next === "mockup";
-      mockupContextPanel.classList.toggle("mockup-context-panel--open", muOpen);
-      if (!muOpen) {
-        mockupContextPanel.setAttribute("inert", "");
-        mockupContextPanel.setAttribute("aria-hidden", "true");
-      } else {
-        mockupContextPanel.removeAttribute("inert");
-        mockupContextPanel.setAttribute("aria-hidden", "false");
-      }
-    }
-    if (next !== "annotate" && next !== "mockup") {
-      canvas.style.cursor = "";
-      lastCanvasPointer.valid = false;
-    }
-    if (currentTool !== "select") {
-      selectedIndex = null;
-    }
+    if (currentTool !== "select") selectedIndex = null;
+    showFlyout(next);
     redraw();
     applyCanvasCursorLast();
-    if (next === "mockup") {
-      previewMockup();
-    }
-  }
-
-  function updateMockupBorderWidthSliderFill() {
-    if (!mockupBorderWidthInput) return;
-    const min = 1;
-    const max = 20;
-    const raw = Number(mockupBorderWidthInput.value);
-    const v = Math.max(min, Math.min(max, Number.isFinite(raw) ? raw : 2));
-    const pct = ((v - min) / (max - min)) * 100;
-    mockupBorderWidthInput.style.background = `linear-gradient(to right, #ffffff 0%, #ffffff ${pct}%, #2a2a2a ${pct}%, #2a2a2a 100%)`;
+    if (next === "mockup") previewMockup();
+    if (next === "annotate") canvas.style.cursor = "crosshair";
   }
 
   function syncMockupPanelFromState() {
-    document.querySelectorAll(".mockup-context-panel__device-btn[data-device]").forEach((btn) => {
-      const el = /** @type {HTMLElement} */ (btn);
-      const is = el.dataset.device === mockupState.device;
+    document.querySelectorAll(".mockup-device-btn[data-device]").forEach((btn) => {
+      const is = btn.getAttribute("data-device") === mockupState.device;
       btn.classList.toggle("is-active", is);
       btn.setAttribute("aria-pressed", String(is));
     });
-    document.querySelectorAll(".mockup-context-panel__pill-btn[data-radius]").forEach((btn) => {
-      const el = /** @type {HTMLElement} */ (btn);
-      const is = Number(el.dataset.radius) === mockupState.radius;
+    if (mockupAdvancedSections) {
+      mockupAdvancedSections.hidden = mockupState.device === "none";
+    }
+    document.querySelectorAll(".mockup-pill-btn[data-radius]").forEach((btn) => {
+      const is = Number(btn.getAttribute("data-radius")) === mockupState.radius;
       btn.classList.toggle("is-active", is);
     });
-    document.querySelectorAll(".mockup-context-panel__pill-btn[data-shadow]").forEach((btn) => {
-      const el = /** @type {HTMLElement} */ (btn);
-      const is = el.dataset.shadow === mockupState.shadow;
+    document.querySelectorAll(".mockup-pill-btn[data-shadow]").forEach((btn) => {
+      const is = btn.getAttribute("data-shadow") === mockupState.shadow;
       btn.classList.toggle("is-active", is);
     });
-    document.querySelectorAll(".mockup-context-panel__bg-swatch[data-bg]").forEach((sw) => {
-      const el = /** @type {HTMLElement} */ (sw);
-      const is = el.dataset.bg === mockupState.background;
+    document.querySelectorAll(".mockup-bg-swatch[data-bg]").forEach((sw) => {
+      const is = sw.getAttribute("data-bg") === mockupState.background;
       sw.classList.toggle("is-active", is);
     });
     const padStr = String(mockupState.padding);
-    document.querySelectorAll(".mockup-context-panel__pill-btn[data-padding]").forEach((btn) => {
-      const el = /** @type {HTMLElement} */ (btn);
-      const is = el.dataset.padding === padStr;
+    document.querySelectorAll(".mockup-pill-btn[data-padding]").forEach((btn) => {
+      const is = btn.getAttribute("data-padding") === padStr;
       btn.classList.toggle("is-active", is);
     });
     if (mockupBorderWidthSection) {
       mockupBorderWidthSection.hidden = mockupState.device !== "border";
     }
-    if (mockupBorderWidthInput && mockupBorderWidthValue) {
-      const bw = Math.max(1, Math.min(20, Number(mockupState.borderWidth) || 2));
-      mockupState.borderWidth = bw;
-      mockupBorderWidthInput.value = String(bw);
-      mockupBorderWidthValue.textContent = `${bw}px`;
-      updateMockupBorderWidthSliderFill();
-    }
-  }
-
-  function setColor(next) {
-    color = next;
-    document.querySelectorAll(".annotate-context-panel__swatch[data-color]").forEach((sw) => {
-      const is = sw.dataset.color === next;
-      sw.classList.toggle("is-active", is);
-      sw.setAttribute("aria-selected", String(is));
-    });
+    const bw = Math.max(0, Math.min(20, Number(mockupState.borderWidth) || 2));
+    mockupState.borderWidth = bw;
+    if (mockupBorderWidthInput) mockupBorderWidthInput.value = String(bw);
+    if (mockupBorderWidthNum) mockupBorderWidthNum.value = String(bw);
   }
 
   function onCanvasMouseDown(ev) {
     if (!baseImage || ev.button !== 0) return;
     const p = getCanvasCoords(ev);
+
+    if (editingAnnotationId != null && currentTool === "annotate") {
+      const hitAnn = pickAnnotationAt(p.x, p.y);
+      if (hitAnn && hitAnn.id === editingAnnotationId) return;
+      return;
+    }
+
+    if (currentTool === "blur") {
+      const id = pickBlurRegion(p.x, p.y);
+      if (id != null) {
+        const r = blurRegions.find((b) => b.id === id);
+        if (r) {
+          const mode = blurHandleAt(p.x, p.y, r);
+          if (mode) {
+            selectedBlurRegionId = id;
+            blurHandleMode = mode;
+            blurEditState = {
+              id,
+              startX: p.x,
+              startY: p.y,
+              startRect: { x: r.x, y: r.y, w: r.w, h: r.h },
+            };
+            redraw();
+            return;
+          }
+        }
+      }
+      blurDragActive = true;
+      blurDragStartX = p.x;
+      blurDragStartY = p.y;
+      blurDragCurX = p.x;
+      blurDragCurY = p.y;
+      selectedBlurRegionId = null;
+      hideBlurTrash();
+      return;
+    }
+
+    if (currentTool === "measure") {
+      const bounds = floodFillBounds(p.x, p.y);
+      if (!bounds) return;
+      if (!measurePinA) {
+        measurePinA = bounds;
+        measurePinB = null;
+        measureHoverB = null;
+      } else if (!measurePinB) {
+        measurePinB = bounds;
+        measureHoverB = null;
+        commitHistory();
+      }
+      renderMeasureOverlay();
+      return;
+    }
 
     if (currentTool === "select") {
       selectDragMoved = false;
@@ -1885,15 +2377,16 @@
     }
 
     if (currentTool === "annotate") {
-      for (let i = annotations.length - 1; i >= 0; i--) {
-        const ann = annotations[i];
-        if (Math.hypot(p.x - ann.pinX, p.y - ann.pinY) <= PIN_HIT_DIST) {
-          isDraggingPin = true;
-          draggedAnnotationId = ann.id;
-          canvas.style.cursor = "grabbing";
-          return;
-        }
+      const hitAnn = pickAnnotationAt(p.x, p.y);
+      if (hitAnn) {
+        if (hitAnn.saved) startEditingAnnotation(hitAnn);
+        else editingAnnotationId = hitAnn.id;
+        isDraggingPin = true;
+        draggedAnnotationId = hitAnn.id;
+        canvas.style.cursor = "grabbing";
+        return;
       }
+      if (editingAnnotationId != null) return;
       annotatePlaceActive = true;
       annotatePlaceDragging = false;
       annotateStartX = p.x;
@@ -1907,6 +2400,70 @@
   function onCanvasMouseMove(ev) {
     if (!baseImage) return;
     const p = getCanvasCoords(ev);
+
+    if (currentTool === "blur") {
+      if (blurEditState) {
+        const r = blurRegions.find((b) => b.id === blurEditState.id);
+        if (r) {
+          const dx = p.x - blurEditState.startX;
+          const dy = p.y - blurEditState.startY;
+          const sr = blurEditState.startRect;
+          if (blurHandleMode === "move") {
+            r.x = sr.x + dx;
+            r.y = sr.y + dy;
+          } else {
+            let { x, y, w, h } = sr;
+            if (blurHandleMode.includes("e")) w = sr.w + dx;
+            if (blurHandleMode.includes("w")) {
+              x = sr.x + dx;
+              w = sr.w - dx;
+            }
+            if (blurHandleMode.includes("s")) h = sr.h + dy;
+            if (blurHandleMode.includes("n")) {
+              y = sr.y + dy;
+              h = sr.h - dy;
+            }
+            if (w > 4 && h > 4) {
+              r.x = x;
+              r.y = y;
+              r.w = w;
+              r.h = h;
+            }
+          }
+          redraw();
+        }
+        applyCanvasCursorFromCoords(p.x, p.y);
+        return;
+      }
+      if (blurDragActive) {
+        blurDragCurX = p.x;
+        blurDragCurY = p.y;
+        redraw();
+        return;
+      }
+      const id = pickBlurRegion(p.x, p.y);
+      if (id !== hoveredBlurRegionId) {
+        hoveredBlurRegionId = id;
+        const r = blurRegions.find((b) => b.id === id);
+        if (r) showBlurTrash(r);
+        else hideBlurTrash();
+        redraw();
+      }
+      applyCanvasCursorFromCoords(p.x, p.y);
+      return;
+    }
+
+    if (currentTool === "measure") {
+      if (!measurePinA || measurePinB) {
+        measureHoverBounds = floodFillBounds(p.x, p.y);
+      } else {
+        measureHoverBounds = null;
+        measureHoverB = floodFillBounds(p.x, p.y);
+      }
+      renderMeasureOverlay();
+      applyCanvasCursorFromCoords(p.x, p.y);
+      return;
+    }
 
     if (currentTool === "annotate") {
       if (isDraggingPin && draggedAnnotationId !== null) {
@@ -1965,6 +2522,25 @@
     if (!baseImage) return;
     if (ev.type === "mouseup" && ev.button !== 0) return;
 
+    if (blurEditState) {
+      blurEditState = null;
+      blurHandleMode = null;
+      commitHistory();
+      redraw();
+      return;
+    }
+
+    if (blurDragActive && currentTool === "blur") {
+      const n = normalizeBlurRect(blurDragStartX, blurDragStartY, blurDragCurX, blurDragCurY);
+      blurDragActive = false;
+      if (n.w >= 4 && n.h >= 4) {
+        blurRegions.push({ id: nextBlurRegionId++, ...n });
+        commitHistory();
+      }
+      redraw();
+      return;
+    }
+
     if (isDraggingPin) {
       const id = draggedAnnotationId;
       isDraggingPin = false;
@@ -2009,8 +2585,21 @@
       isSelectDragging = false;
       selectOffset = null;
     }
+    if (currentTool === "blur" && (blurDragActive || blurEditState)) {
+      onCanvasMouseUp({ type: "mouseup", button: 0 });
+    }
     if (currentTool === "annotate" && (annotatePlaceActive || isDraggingPin)) {
       onCanvasMouseUp({ type: "mouseup", button: 0 });
+    }
+    if (currentTool === "blur") {
+      hoveredBlurRegionId = null;
+      hideBlurTrash();
+      redraw();
+    }
+    if (currentTool === "measure") {
+      measureHoverBounds = null;
+      if (!measurePinB) measureHoverB = null;
+      renderMeasureOverlay();
     }
     applyCanvasCursorLast();
   }
@@ -2032,7 +2621,7 @@
     const url = out.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
-    a.download = "snapmark-export.png";
+    a.download = `${sanitizeFilename(filenameInput?.value)}.png`;
     a.click();
   });
 
@@ -2075,101 +2664,109 @@
     }
   });
 
-  if (btnFeedback) {
-    btnFeedback.addEventListener("click", () => {
+  if (btnHelp) {
+    btnHelp.addEventListener("click", () => {
       window.open(FEEDBACK_FORM_URL, "_blank");
     });
   }
 
   document.querySelectorAll(".sidebar-tool[data-tool]").forEach((btn) => {
-    btn.addEventListener("click", () => setTool(/** @type {HTMLElement} */ (btn).dataset.tool || "select"));
+    btn.addEventListener("click", () => setTool(/** @type {HTMLElement} */ (btn).dataset.tool || "annotate"));
   });
 
-  if (mockupContextPanel) {
-    mockupContextPanel.addEventListener("click", (e) => {
+  if (toolFlyouts) {
+    toolFlyouts.addEventListener("click", (e) => {
       const t = e.target;
       if (!(t instanceof Element)) return;
-
-      if (t.closest("#mockup-apply-btn")) {
-        applyMockup();
-        return;
-      }
-      if (t.closest("#mockup-reset-link")) {
-        resetMockup();
-        return;
-      }
-
-      const devEl = t.closest(".mockup-context-panel__device-btn[data-device]");
+      const devEl = t.closest(".mockup-device-btn[data-device]");
       if (devEl) {
         const d = devEl.getAttribute("data-device");
         if (d === "none" || d === "browser" || d === "border") {
           mockupState.device = d;
           syncMockupPanelFromState();
-          previewMockup();
+          previewMockup(() => commitHistory());
         }
         return;
       }
-
-      const radEl = t.closest(".mockup-context-panel__pill-btn[data-radius]");
+      const radEl = t.closest(".mockup-pill-btn[data-radius]");
       if (radEl) {
         const n = Number(radEl.getAttribute("data-radius"));
         if (n === 0 || n === 8 || n === 16 || n === 24) {
           mockupState.radius = n;
           syncMockupPanelFromState();
-          previewMockup();
+          previewMockup(() => commitHistory());
         }
         return;
       }
-
-      const shEl = t.closest(".mockup-context-panel__pill-btn[data-shadow]");
-      if (shEl && shEl.hasAttribute("data-shadow")) {
-        const s = /** @type {string} */ (shEl.getAttribute("data-shadow"));
+      const shEl = t.closest(".mockup-pill-btn[data-shadow]");
+      if (shEl) {
+        const s = shEl.getAttribute("data-shadow");
         if (s === "none" || s === "soft" || s === "medium" || s === "hard") {
-          mockupState.shadow = /** @type {'none'|'soft'|'medium'|'hard'} */ (s);
+          mockupState.shadow = s;
           syncMockupPanelFromState();
-          previewMockup();
+          previewMockup(() => commitHistory());
         }
         return;
       }
-
-      const swEl = t.closest(".mockup-context-panel__bg-swatch[data-bg]");
+      const swEl = t.closest(".mockup-bg-swatch[data-bg]");
       if (swEl) {
         mockupState.background = swEl.getAttribute("data-bg") || "#f5f5f5";
         syncMockupPanelFromState();
-        previewMockup();
+        previewMockup(() => commitHistory());
         return;
       }
-
-      const padEl = t.closest(".mockup-context-panel__pill-btn[data-padding]");
-      if (padEl && padEl.hasAttribute("data-padding")) {
+      const padEl = t.closest(".mockup-pill-btn[data-padding]");
+      if (padEl) {
         const n = Number(padEl.getAttribute("data-padding"));
         if (n === 24 || n === 48 || n === 80) {
           mockupState.padding = n;
           syncMockupPanelFromState();
-          previewMockup();
+          previewMockup(() => commitHistory());
         }
       }
     });
   }
 
+  if (mockupResetBtn) {
+    mockupResetBtn.addEventListener("click", () => resetMockup());
+  }
+
+  function syncMockupBorderFromInput(raw) {
+    const n = Math.max(0, Math.min(20, Number.isFinite(Number(raw)) ? Number(raw) : 2));
+    mockupState.borderWidth = n;
+    if (mockupBorderWidthInput) mockupBorderWidthInput.value = String(n);
+    if (mockupBorderWidthNum) mockupBorderWidthNum.value = String(n);
+    previewMockup(() => commitHistory());
+  }
+
   if (mockupBorderWidthInput) {
-    mockupBorderWidthInput.addEventListener("input", () => {
-      const raw = Number(mockupBorderWidthInput.value);
-      const n = Math.max(1, Math.min(20, Number.isFinite(raw) ? raw : 2));
-      mockupState.borderWidth = n;
-      if (mockupBorderWidthValue) mockupBorderWidthValue.textContent = `${n}px`;
-      updateMockupBorderWidthSliderFill();
-      previewMockup();
+    mockupBorderWidthInput.addEventListener("input", () => syncMockupBorderFromInput(mockupBorderWidthInput.value));
+  }
+  if (mockupBorderWidthNum) {
+    mockupBorderWidthNum.addEventListener("input", () => syncMockupBorderFromInput(mockupBorderWidthNum.value));
+  }
+
+  if (blurIntensityInput) {
+    blurIntensityInput.addEventListener("input", () => {
+      syncBlurIntensityControls(blurIntensityInput.value);
+      redraw();
+      commitHistory();
+    });
+  }
+  if (blurIntensityNum) {
+    blurIntensityNum.addEventListener("input", () => {
+      syncBlurIntensityControls(blurIntensityNum.value);
+      redraw();
+      commitHistory();
     });
   }
 
-  document.querySelectorAll(".annotate-context-panel__swatch[data-color]").forEach((sw) => {
-    sw.addEventListener("click", () => setColor(/** @type {HTMLElement} */ (sw).dataset.color || "#FF4444"));
-  });
-
   function isTypingInAnnotationEditor() {
     const a = document.activeElement;
-    return a instanceof HTMLElement && (a.classList.contains("annotation-card__body") || !!a.closest(".annotation-card__body"));
+    return (
+      a instanceof HTMLTextAreaElement &&
+      a.classList.contains("annotation-card__body-input")
+    );
   }
 
   document.addEventListener(
@@ -2187,16 +2784,49 @@
         setTool("annotate");
         return;
       }
+      if ((e.key === "b" || e.key === "B") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (isTypingInAnnotationEditor()) return;
+        e.preventDefault();
+        setTool("blur");
+        return;
+      }
       if ((e.key === "m" || e.key === "M") && !e.metaKey && !e.ctrlKey && !e.altKey) {
         if (isTypingInAnnotationEditor()) return;
         e.preventDefault();
         setTool("mockup");
         return;
       }
+      if ((e.key === "d" || e.key === "D") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (isTypingInAnnotationEditor()) return;
+        e.preventDefault();
+        setTool("measure");
+        return;
+      }
       if (e.key === "Escape") {
-        if (currentTool === "annotate" || currentTool === "mockup") {
+        if (currentTool === "annotate") {
           e.preventDefault();
-          setTool("select");
+          cancelEditingAnnotation();
+          return;
+        }
+        if (currentTool === "blur") {
+          e.preventDefault();
+          selectedBlurRegionId = null;
+          hideBlurTrash();
+          redraw();
+          return;
+        }
+        if (currentTool === "measure") {
+          e.preventDefault();
+          resetMeasureState();
+          return;
+        }
+        return;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && currentTool === "blur") {
+        if (isTypingInAnnotationEditor()) return;
+        if (selectedBlurRegionId != null) {
+          e.preventDefault();
+          removeBlurRegion(selectedBlurRegionId);
         }
         return;
       }
@@ -2234,7 +2864,7 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#888";
       ctx.font = "14px Inter, system-ui, sans-serif";
-      ctx.fillText("No screenshot found. Capture from the SnapMark popup.", 24, 40);
+      ctx.fillText("No screenshot found. Capture from the Snappd popup.", 24, 40);
       return;
     }
 
@@ -2242,12 +2872,7 @@
       await clearScreenshotFromIdb();
     } catch (_) {}
 
-    const img = new Image();
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-      img.src = raw;
-    });
+    const img = await loadImage(raw);
     originalCaptureW = img.naturalWidth;
     originalCaptureH = img.naturalHeight;
 
@@ -2258,13 +2883,43 @@
     baseImage = img;
     lastMockupScreenshotOrigin = { x: 0, y: 0 };
 
+    await new Promise((resolve) => {
+      const tmp = document.createElement("canvas");
+      tmp.width = originalCaptureW;
+      tmp.height = originalCaptureH;
+      const tctx = tmp.getContext("2d");
+      if (!tctx) {
+        resolve();
+        return;
+      }
+      const m = new Image();
+      m.onload = () => {
+        tctx.drawImage(m, 0, 0);
+        const data = tctx.getImageData(0, 0, originalCaptureW, originalCaptureH);
+        measurePixelData = data.data;
+        measurePixelW = originalCaptureW;
+        measurePixelH = originalCaptureH;
+        resolve();
+      };
+      m.onerror = () => resolve();
+      m.src = originalImageData;
+    });
+
+    injectLucideIcons();
+    setupFlyoutHover();
     attachCanvasListeners();
+
+    if (filenameInput) filenameInput.value = defaultExportFilename();
+    syncBlurIntensityControls(BLUR_INTENSITY_DEFAULT);
 
     const ro = new ResizeObserver(() => {
       positionAllCards();
       updateConnectorsSVG();
     });
     ro.observe(canvasStack);
+
+    setTool("annotate");
+    canvas.style.cursor = "crosshair";
 
     redraw();
     requestAnimationFrame(() => {
@@ -2276,7 +2931,6 @@
     historyIndex = 0;
     updateUndoRedoButtons();
     syncMockupPanelFromState();
-    updateMockupResetRow();
   }
 
   init().catch((err) => {

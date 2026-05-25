@@ -106,7 +106,7 @@ async function runFullPageCapture() {
 
   if (!isInjectCapturableUrl(tab.url)) {
     setStatus("Cannot capture this page type");
-    console.warn("[SnapMark] Skipping inject; URL:", tab.url);
+    console.warn("[Snappd] Skipping inject; URL:", tab.url);
     return;
   }
 
@@ -116,7 +116,7 @@ async function runFullPageCapture() {
       files: [CAPTURE_SCRIPT],
     });
   } catch (err) {
-    console.error("[SnapMark] executeScript failed:", err);
+    console.error("[Snappd] executeScript failed:", err);
     setStatus("Cannot inject capture script on this page");
     return;
   }
